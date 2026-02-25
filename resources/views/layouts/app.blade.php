@@ -1,85 +1,36 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-bs-theme="light">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="WorkNepal – Trusted job search & hiring platform in Nepal">
-    <meta name="author" content="Rohit Mehta">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <!-- Title -->
-    <title>@yield('title', 'WorkNepal – Jobs in Nepal')</title>
+        <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Favicon (add your own later) -->
-    <link rel="icon" type="image/png" href="{{ asset('images/favicon.png') }}">
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-    <!-- Bootstrap 5.3 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+        <!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    </head>
+    <body class="font-sans antialiased">
+        <div class="min-h-screen bg-gray-100">
+            @include('layouts.navigation')
 
-    <!-- Font Awesome 6 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <!-- Page Heading -->
+            @if (isset($header))
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{ $header }}
+                    </div>
+                </header>
+            @endif
 
-    
-
-    <!-- Custom styles -->
-    <style>
-        :root {
-            --primary:    #1E3A8A;  /* Deep Blue */
-            --accent:     #DC2626;  /* Nepal Red */
-            --bg:         #F8FAFC;
-            --text:       #1F2937;
-            --text-muted: #6B7280;
-            --success:    #16A34A;
-        }
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        main {
-            flex: 1;
-        }
-        .navbar-brand {
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-        .btn-primary {
-            background-color: var(--primary);
-            border-color: var(--primary);
-        }
-        .btn-primary:hover {
-            background-color: #172554;
-            border-color: #172554;
-        }
-        .text-accent { color: var(--accent) !important; }
-        .bg-accent   { background-color: var(--accent) !important; }
-        .badge-accent { background-color: var(--accent); color: white; }
-    </style>
-
-    @stack('styles')
-</head>
-<body>
-
-    <!-- Header / Navbar -->
-    @include('partials.header')  <!-- or navbar.blade.php if you renamed it -->
-
-    <!-- Main Content -->
-    <main class="flex-grow-1 py-4 py-lg-5">
-        <div class="container-xl">
-            @yield('content')
+            <!-- Page Content -->
+            <main>
+                {{ $slot }}
+            </main>
         </div>
-    </main>
-
-    <!-- Footer -->
-    @include('partials.footer')
-
-    <!-- Bootstrap JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-
-    <!-- Scripts stack -->
-    @stack('scripts')
-
-</body>
+    </body>
 </html>

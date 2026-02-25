@@ -10,6 +10,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use App\Support\Enums\AccountStatus;
+use App\Support\Enums\Gender;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -51,24 +53,26 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * The attributes that should be cast.
      *
-     * @var array<string, string>
+     * @var array<string, string|class-string>
      */
     protected $casts = [
         'email_verified_at'    => 'datetime',
         'mobile_verified_at'   => 'datetime',
         'date_of_birth'        => 'date',
         'last_login_at'        => 'datetime',
-        'account_status'       => 'string',
+        'gender'               => Gender::class,
+        'account_status'       => AccountStatus::class,
         'password'             => 'hashed',
     ];
 
     /**
-     * Default attributes.
+     * Default attribute values.
+     * IMPORTANT: Use enum cases directly when casting is active.
      *
      * @var array
      */
     protected $attributes = [
-        'account_status' => 'active',
+        'account_status' => AccountStatus::ACTIVE,  // ← FIXED: use enum case, not string
     ];
 
     // ────────────────────────────────────────────────
@@ -102,7 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasCompletedProfile(): bool
     {
         return filled($this->name)
-            && filled($this->gender)
+            && filled($this->gender?->value)           // safe access with enum
             && filled($this->date_of_birth)
             && ($this->email_verified_at || $this->mobile_verified_at);
     }
@@ -119,17 +123,11 @@ class User extends Authenticatable implements MustVerifyEmail
     //  Relationships
     // ────────────────────────────────────────────────
 
-    /**
-     * Social login connections
-     */
     public function socialAccounts()
     {
         return $this->hasMany(SocialAccount::class);
     }
 
-    /**
-     * Companies this user belongs to (as member/owner/hr/etc.)
-     */
     public function companies()
     {
         return $this->belongsToMany(Company::class, 'company_user')
@@ -137,17 +135,11 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
-    /**
-     * Companies owned by this user
-     */
     public function ownedCompanies()
     {
         return $this->hasMany(Company::class, 'owner_id');
     }
 
-    /**
-     * Currently active company (can be stored in session later)
-     */
     public function currentCompany()
     {
         return $this->companies()->wherePivot('is_active', true)->first();
@@ -159,7 +151,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function scopeActive($query)
     {
-        return $query->where('account_status', 'active');
+        return $query->where('account_status', AccountStatus::ACTIVE);
     }
 
     public function scopeAdmins($query)

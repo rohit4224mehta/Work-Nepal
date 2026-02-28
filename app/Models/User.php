@@ -111,6 +111,21 @@ class User extends Authenticatable implements MustVerifyEmail
             && ($this->email_verified_at || $this->mobile_verified_at);
     }
 
+    
+public function profileCompletionPercentage(): int
+{
+    $points = 0;
+    $total = 5; // 5 key fields
+
+    if ($this->profile_photo_path) $points++;
+    if ($this->resume_path ?? false) $points++;           // assuming you add resume_path later
+    if ($this->skills && count($this->skills) > 0) $points++;
+    if ($this->experience && count($this->experience) > 0) $points++;
+    if ($this->education && count($this->education) > 0) $points++;
+
+    return (int) round(($points / $total) * 100);
+}
+
     /**
      * Check if user is considered an employer (has at least one company)
      */
@@ -163,4 +178,11 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $query->role('job_seeker');
     }
+    /**
+ * The job applications submitted by this user
+ */
+public function jobApplications()
+{
+    return $this->hasMany(JobApplication::class, 'user_id');
+}
 }

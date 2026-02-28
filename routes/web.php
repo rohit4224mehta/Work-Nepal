@@ -1,19 +1,22 @@
+
 <?php
 
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\Dashboard\JobSeekerDashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JobController;
-use App\Http\Controllers\PageController;     // for static pages
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+
+
 
 /*
 |--------------------------------------------------------------------------
 | Web Routes - WorkNepal Job Platform
 |--------------------------------------------------------------------------
 |
-| Public (guest) routes first → then authenticated → then role-specific
-| All routes are web middleware group by default
+| Public routes first → authentication → protected/authenticated
 |
 */
 
@@ -23,18 +26,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-// Public Job Search & Details (Phase 3 of your plan)
 Route::prefix('jobs')->name('jobs.')->group(function () {
-    Route::get('/', [JobController::class, 'index'])->name('index');           // list + filters
-    Route::get('/{job:slug}', [JobController::class, 'show'])->name('show');   // detail page
+    Route::get('/', [JobController::class, 'index'])->name('index');
+    Route::get('/{job:slug}', [JobController::class, 'show'])->name('show');
 });
 
-// Public Company Profiles (future)
 Route::prefix('companies')->name('companies.')->group(function () {
     Route::get('/{company:slug}', [CompanyController::class, 'show'])->name('show');
 });
 
-// Static / Informational Pages
 Route::prefix('pages')->name('pages.')->group(function () {
     Route::get('/about', [PageController::class, 'about'])->name('about');
     Route::get('/contact', [PageController::class, 'contact'])->name('contact');
@@ -45,49 +45,36 @@ Route::prefix('pages')->name('pages.')->group(function () {
 });
 
 // ────────────────────────────────────────────────
-// 2. Authentication Routes (included from Breeze)
+// 2. Breeze Authentication Routes
 // ────────────────────────────────────────────────
 
 require __DIR__.'/auth.php';
 
+require __DIR__.'/verification.php';
 // ────────────────────────────────────────────────
-// 3. Authenticated Routes (must be logged in)
+// 4. Protected / Authenticated Routes (require login + verified + active)
 // ────────────────────────────────────────────────
 
-Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
 
-    // Profile (Breeze default – keep for now)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Temporary / fallback dashboard (will be replaced by role-based redirect)
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
-    // ────────────────────────────────────────────────
-    // Role-based routes (expand in later phases)
-    // ────────────────────────────────────────────────
-
-    // Job Seeker Routes (Phase 2, 4, etc.)
-    Route::middleware('role:job_seeker')->prefix('seeker')->name('seeker.')->group(function () {
-        // Route::get('/profile/complete', ...)->name('profile.complete');
-        // Route::get('/applications', ...)->name('applications.index');
-        // Route::get('/bookmarks', ...)->name('bookmarks.index');
+    // Job Seeker Routes
+    Route::middleware('role:job_seeker')->group(function () {
+        Route::prefix('dashboard')->name('dashboard.')->group(function () {
+            Route::get('/', [JobSeekerDashboardController::class, 'index'])->name('jobseeker');
+        });
     });
 
-    // Employer Routes (Phase 5)
+    // Employer Routes
     Route::middleware(['role:employer', 'employer'])->prefix('employer')->name('employer.')->group(function () {
-        // Route::resource('jobs', EmployerJobController::class)->except(['show']);
-        // Route::get('/company/create', ...)->name('company.create');
-        // Route::get('/applicants', ...)->name('applicants.index');
+        // Add your employer routes here
     });
 
-    // Admin Routes (Phase 6)
+    // Admin Routes
     Route::middleware('role:admin|super_admin')->prefix('admin')->name('admin.')->group(function () {
-        // Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
-        // Route::get('/jobs/pending', ...)->name('jobs.pending');
-        // Route::post('/jobs/{job}/approve', ...)->name('jobs.approve');
+        // Add your admin routes here
     });
 });

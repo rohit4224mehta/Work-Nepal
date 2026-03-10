@@ -162,6 +162,7 @@
                                 </button>
                             </span>
                         @endforeach
+                        
                     @else
                         <p class="text-gray-600">No skills added yet. Add your top skills below.</p>
                     @endif

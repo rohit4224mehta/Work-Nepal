@@ -36,4 +36,20 @@ class JobSeekerDashboardController extends Controller
             'recentApplications'
         ));
     }
+
+    public function profileCompletionPercentage(): int
+{
+    $points = 0;
+    $total = 5; // adjust as needed
+
+    if ($this->profile_photo_path) $points++;
+    if ($this->resume_path ?? false) $points++;
+
+    // Safe check: only load if relationship exists
+    if (method_exists($this, 'skills') && $this->skills?->count() > 0) $points++;
+    if (method_exists($this, 'experience') && $this->experience?->count() > 0) $points++;
+    if (method_exists($this, 'education') && $this->education?->count() > 0) $points++;
+
+    return (int) round(($points / $total) * 100);
+}
 }

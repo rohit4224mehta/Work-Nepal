@@ -115,13 +115,14 @@ class User extends Authenticatable implements MustVerifyEmail
 public function profileCompletionPercentage(): int
 {
     $points = 0;
-    $total = 5; // 5 key fields
+    $total = 5; // adjust as needed
 
     if ($this->profile_photo_path) $points++;
-    if ($this->resume_path ?? false) $points++;           // assuming you add resume_path later
-    if ($this->skills && count($this->skills) > 0) $points++;
-    if ($this->experience && count($this->experience) > 0) $points++;
-    if ($this->education && count($this->education) > 0) $points++;
+    if ($this->resume_path ?? false) $points++;
+
+    // Safe check: only load if relationship exists
+    if (method_exists($this, 'skills') && $this->skills?->count() > 0) $points++;
+    if (method_exists($this, 'experience') && $this->experience?->count() > 0) $points++;
 
     return (int) round(($points / $total) * 100);
 }
@@ -184,5 +185,19 @@ public function profileCompletionPercentage(): int
 public function jobApplications()
 {
     return $this->hasMany(JobApplication::class, 'user_id');
+}
+public function skills()
+{
+    return $this->belongsToMany(Skill::class, 'skill_user', 'user_id', 'skill_id')
+                ->withTimestamps();
+}
+
+public function education()
+{
+    return $this->hasMany(Education::class);
+}
+public function experience()
+{
+    return $this->hasMany(Experience::class);
 }
 }

@@ -19,7 +19,7 @@
     @include('partials.low-data-notice')
 
     <!-- Guest Navbar -->
-    @include('partials.navbar')
+    @include('components.navbar')
 
     <!-- Main Content -->
     <main class="min-h-screen">

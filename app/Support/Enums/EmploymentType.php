@@ -2,15 +2,14 @@
 
 namespace App\Support\Enums;
 
-enum JobType: string
+enum EmploymentType: string
 {
     case FULL_TIME = 'full-time';
     case PART_TIME = 'part-time';
     case CONTRACT = 'contract';
-    case INTERNSHIP = 'internship';
+    case TEMPORARY = 'temporary';
     case FREELANCE = 'freelance';
-    case REMOTE = 'remote';
-    case HYBRID = 'hybrid';
+    case INTERNSHIP = 'internship';
 
     public function label(): string
     {
@@ -18,15 +17,9 @@ enum JobType: string
             self::FULL_TIME => 'Full Time',
             self::PART_TIME => 'Part Time',
             self::CONTRACT => 'Contract',
+            self::TEMPORARY => 'Temporary',
+            self::FREELANCE => 'Freelance',
             self::INTERNSHIP => 'Internship',
-            self::FREELANCE => 'Freelance / Project',
-            self::REMOTE => 'Remote / Work from Home',
-            self::HYBRID => 'Hybrid',
         };
-    }
-
-    public static function options(): array
-    {
-        return array_map(fn($case) => $case->value, self::cases());
     }
 }

@@ -1,12 +1,12 @@
-@extends('layouts.app-jobseeker')
+@extends('layouts.app')
 
-@section('dashboard-content')
+@section('title', 'Job Seeker Dashboard - WorkNepal')
 
+@section('content')
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
         <!-- Left Column: Profile + Progress + Quick Actions -->
         <div class="lg:col-span-1 space-y-6">
-
             <!-- Profile Completion Card -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -42,7 +42,7 @@
                         </li>
                     @endif
 
-                    @if(auth()->user()->skills->isEmpty())
+                    @if(auth()->user()->skills?->isEmpty() ?? true)
                         <li class="flex items-center text-red-600">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -76,12 +76,10 @@
                     </a>
                 </div>
             </div>
-
         </div>
 
-        <!-- Middle Column: Suggested Jobs + Applications -->
+        <!-- Middle Column -->
         <div class="lg:col-span-2 space-y-6">
-
             <!-- Suggested Jobs -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 lg:p-8">
                 <div class="flex items-center justify-between mb-6">
@@ -117,14 +115,14 @@
                     </a>
                 </div>
 
-                @if($recentApplications->isEmpty())
+                @if(!$recentApplications || $recentApplications->isEmpty())
                     <p class="text-gray-500 dark:text-gray-400 text-center py-8">
                         You haven't applied to any jobs yet. Start exploring!
                     </p>
                 @else
                     <div class="space-y-4">
                         @foreach($recentApplications as $application)
-                            <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg flex items-center justify-between">
                                 <div>
                                     <h4 class="font-medium text-gray-900 dark:text-white">
                                         {{ $application->job->title }}
@@ -134,20 +132,20 @@
                                     </p>
                                 </div>
                                 <span class="px-3 py-1 rounded-full text-xs font-medium
-                                    {{ $application->status->color() }} bg-opacity-10">
-                                    {{ $application->status->label() }}
+                                    {{ $application->status === 'applied' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : '' }}
+                                    {{ $application->status === 'shortlisted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : '' }}
+                                    {{ $application->status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : '' }}">
+                                    {{ ucfirst($application->status) }}
                                 </span>
                             </div>
                         @endforeach
                     </div>
                 @endif
             </div>
-
         </div>
-
     </div>
 
-    <!-- Nepal-Specific Trust Banner -->
+    <!-- Trust Banner -->
     <div class="mt-12 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 p-6 rounded-lg">
         <h4 class="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
             Important: Foreign Job Safety
@@ -159,5 +157,4 @@
             Read Safety Guidelines →
         </a>
     </div>
-
 @endsection

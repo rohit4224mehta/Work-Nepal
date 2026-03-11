@@ -74,6 +74,8 @@ require __DIR__.'/verification.php';
 // Basic auth-required routes (edit profile, etc. — no verification needed to access edit form)
 Route::middleware('auth')->group(function () {
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    // Password routes
+    Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
 });
 
 // Full verification + account active required for actions that modify data

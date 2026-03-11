@@ -15,17 +15,8 @@ use App\Support\Enums\Gender;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens;
-    use HasFactory;
-    use Notifiable;
-    use SoftDeletes;
-    use HasRoles;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasRoles;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -37,107 +28,119 @@ class User extends Authenticatable implements MustVerifyEmail
         'account_status',
         'last_login_at',
         'last_login_ip',
+        'headline',
+        'summary',
+        'resume_path',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
         'last_login_ip',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string|class-string>
-     */
     protected $casts = [
-        'email_verified_at'    => 'datetime',
-        'mobile_verified_at'   => 'datetime',
-        'date_of_birth'        => 'date',
-        'last_login_at'        => 'datetime',
-        'gender'               => Gender::class,
-        'account_status'       => AccountStatus::class,
-        'password'             => 'hashed',
+        'email_verified_at'  => 'datetime',
+        'mobile_verified_at' => 'datetime',
+        'date_of_birth'      => 'date',
+        'last_login_at'      => 'datetime',
+        'gender'             => Gender::class,
+        'account_status'     => AccountStatus::class,
+        'password'           => 'hashed',
     ];
 
-    /**
-     * Default attribute values.
-     * IMPORTANT: Use enum cases directly when casting is active.
-     *
-     * @var array
-     */
     protected $attributes = [
-        'account_status' => AccountStatus::ACTIVE,  // ← FIXED: use enum case, not string
+        'account_status' => AccountStatus::ACTIVE,
     ];
 
-    // ────────────────────────────────────────────────
-    //  Accessors & Mutators
-    // ────────────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * Get the user's profile photo URL.
-     */
     protected function profilePhotoUrl(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value): string => $value
-                ? asset('storage/' . $value)
+            get: fn (?string $value): string =>
+                $value
+                ? asset('storage/'.$value)
                 : $this->defaultProfilePhotoUrl(),
         );
     }
 
-    /**
-     * Default avatar when no photo is set.
-     */
     protected function defaultProfilePhotoUrl(): string
     {
         $name = urlencode($this->name ?? 'User');
+
         return "https://ui-avatars.com/api/?name={$name}&background=random&size=256";
     }
 
-    /**
-     * Check if user has completed basic profile.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Profile Helpers
+    |--------------------------------------------------------------------------
+    */
+
     public function hasCompletedProfile(): bool
     {
         return filled($this->name)
-            && filled($this->gender?->value)           // safe access with enum
+            && filled($this->gender?->value)
             && filled($this->date_of_birth)
             && ($this->email_verified_at || $this->mobile_verified_at);
     }
 
-    
-public function profileCompletionPercentage(): int
-{
-    $points = 0;
-    $total = 5; // adjust as needed
+    /**
+     * Profile completion calculation used by dashboard
+     */
+    public function profileCompletionPercentage(): int
+    {
+        $score = 0;
 
-    if ($this->profile_photo_path) $points++;
-    if ($this->resume_path ?? false) $points++;
+        if ($this->profile_photo_path) {
+            $score += 15;
+        }
 
-    // Safe check: only load if relationship exists
-    if (method_exists($this, 'skills') && $this->skills?->count() > 0) $points++;
-    if (method_exists($this, 'experience') && $this->experience?->count() > 0) $points++;
+        if ($this->resume_path) {
+            $score += 20;
+        }
 
-    return (int) round(($points / $total) * 100);
-}
+        if ($this->headline) {
+            $score += 10;
+        }
+
+        if ($this->summary) {
+            $score += 15;
+        }
+
+        if ($this->skills()->exists()) {
+            $score += 20;
+        }
+
+        if ($this->education()->exists()) {
+            $score += 10;
+        }
+
+        if ($this->experience()->exists()) {
+            $score += 10;
+        }
+
+        return min($score, 100);
+    }
 
     /**
-     * Check if user is considered an employer (has at least one company)
+     * Determine if user acts as employer
      */
     public function isEmployer(): bool
     {
         return $this->companies()->exists();
     }
 
-    // ────────────────────────────────────────────────
-    //  Relationships
-    // ────────────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function socialAccounts()
     {
@@ -158,12 +161,37 @@ public function profileCompletionPercentage(): int
 
     public function currentCompany()
     {
-        return $this->companies()->wherePivot('is_active', true)->first();
+        return $this->companies()
+            ->wherePivot('is_active', true)
+            ->first();
     }
 
-    // ────────────────────────────────────────────────
-    //  Scopes
-    // ────────────────────────────────────────────────
+    public function jobApplications()
+    {
+        return $this->hasMany(JobApplication::class);
+    }
+
+    public function skills()
+    {
+        return $this->belongsToMany(Skill::class, 'skill_user')
+            ->withTimestamps();
+    }
+
+    public function education()
+    {
+        return $this->hasMany(Education::class);
+    }
+
+    public function experience()
+    {
+        return $this->hasMany(Experience::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+    */
 
     public function scopeActive($query)
     {
@@ -179,25 +207,4 @@ public function profileCompletionPercentage(): int
     {
         return $query->role('job_seeker');
     }
-    /**
- * The job applications submitted by this user
- */
-public function jobApplications()
-{
-    return $this->hasMany(JobApplication::class, 'user_id');
-}
-public function skills()
-{
-    return $this->belongsToMany(Skill::class, 'skill_user', 'user_id', 'skill_id')
-                ->withTimestamps();
-}
-
-public function education()
-{
-    return $this->hasMany(Education::class);
-}
-public function experience()
-{
-    return $this->hasMany(Experience::class);
-}
 }

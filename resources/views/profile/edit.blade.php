@@ -15,18 +15,16 @@
                 </p>
             </div>
             
-            {{-- Profile Completion Card --}}
+            {{-- Profile Completion Card (Static - will update on page reload) --}}
             <div class="mt-4 lg:mt-0 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 min-w-[250px]">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Profile Strength</span>
-                    <span class="text-xl font-bold text-red-600 dark:text-red-500" id="completion-percentage">{{ $completion }}%</span>
+                    <span class="text-xl font-bold text-red-600 dark:text-red-500">{{ $completion }}%</span>
                 </div>
                 <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                    <div class="bg-red-600 dark:bg-red-500 h-2.5 rounded-full transition-all duration-500" 
-                         id="completion-bar"
-                         style="width: {{ $completion }}%"></div>
+                    <div class="bg-red-600 dark:bg-red-500 h-2.5 rounded-full" style="width: {{ $completion }}%"></div>
                 </div>
-                <p class="mt-2 text-xs text-gray-600 dark:text-gray-400" id="completion-message">
+                <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
                     {{ $completion < 80 ? 'Add more details to reach 80%+' : 'Excellent! Your profile is ready.' }}
                 </p>
             </div>
@@ -40,6 +38,22 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="mb-6 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="mb-6 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl">
+            <ul class="list-disc list-inside">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     {{-- Main Profile Form --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -49,67 +63,67 @@
                 <div class="p-6">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Profile Sections</h2>
                     <nav class="space-y-2">
-                        <a href="#photo" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#photo" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Profile Photo
-                            <span class="ml-auto text-xs {{ $user->profile_photo_path ? 'text-green-600' : 'text-gray-400' }}" id="photo-status">
+                            <span class="ml-auto text-xs {{ $user->profile_photo_path ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->profile_photo_path ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#basic" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#basic" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Basic Information
                             <span class="ml-auto text-xs {{ $user->name && $user->email && $user->mobile ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->name && $user->email && $user->mobile ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#headline" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#headline" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Professional Headline
                             <span class="ml-auto text-xs {{ $user->headline ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->headline ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#summary" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#summary" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Professional Summary
                             <span class="ml-auto text-xs {{ $user->summary ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->summary ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#skills" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#skills" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Skills
                             <span class="ml-auto text-xs {{ $user->skills->count() > 0 ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->skills->count() > 0 ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#education" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#education" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Education
                             <span class="ml-auto text-xs {{ $user->education->count() > 0 ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->education->count() > 0 ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#experience" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#experience" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Work Experience
                             <span class="ml-auto text-xs {{ $user->experience->count() > 0 ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->experience->count() > 0 ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#resume" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#resume" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Resume
                             <span class="ml-auto text-xs {{ $user->resume_path ? 'text-green-600' : 'text-gray-400' }}">
                                 {{ $user->resume_path ? '✓' : '○' }}
                             </span>
                         </a>
-                        <a href="#preferences" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors section-nav-link">
+                        <a href="#preferences" class="flex items-center px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                             <span class="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                             Job Preferences
-                            <span class="ml-auto text-xs {{ $user->preferences ? 'text-green-600' : 'text-gray-400' }}">
-                                {{ $user->preferences ? '✓' : '○' }}
+                            <span class="ml-auto text-xs {{ $user->jobPreference ? 'text-green-600' : 'text-gray-400' }}">
+                                {{ $user->jobPreference ? '✓' : '○' }}
                             </span>
                         </a>
                     </nav>
@@ -134,19 +148,10 @@
                     <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                         <div class="relative">
                             <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200 dark:border-gray-700">
-                                <img id="profile-photo-preview" 
-                                     src="{{ $user->profile_photo_url ?? asset('images/default-avatar.png') }}" 
+                                <img src="{{ $user->profile_photo_url }}" 
                                      alt="Profile Photo" 
                                      class="w-full h-full object-cover">
                             </div>
-                            <button type="button" 
-                                    onclick="document.getElementById('photo-input').click()"
-                                    class="absolute bottom-0 right-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </button>
                         </div>
                         <div class="flex-1 text-center sm:text-left">
                             <p class="text-gray-600 dark:text-gray-400 mb-2">
@@ -155,21 +160,27 @@
                             <p class="text-sm text-gray-500 mb-4">
                                 JPG, PNG • Max 2MB • Recommended 400×400
                             </p>
-                            <div class="flex flex-wrap gap-3 justify-center sm:justify-start">
-                                <input type="file" id="photo-input" accept="image/jpeg,image/png" class="hidden">
-                                <button type="button" 
-                                        onclick="uploadPhoto()"
+                            
+                            {{-- Photo Upload Form --}}
+                            <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="inline">
+                                @csrf
+                                <input type="file" name="photo" id="photo-input" accept="image/jpeg,image/png" class="hidden" onchange="this.form.submit()">
+                                <button type="button" onclick="document.getElementById('photo-input').click()" 
                                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
                                     Upload New Photo
                                 </button>
-                                @if($user->profile_photo_path)
-                                <button type="button" 
-                                        onclick="removePhoto()"
-                                        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-medium">
-                                    Remove Photo
-                                </button>
-                                @endif
-                            </div>
+                            </form>
+                            
+                            @if($user->profile_photo_path)
+                                <form method="POST" action="{{ route('profile.photo.remove') }}" class="inline ml-2">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" onclick="return confirm('Remove profile photo?')"
+                                            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-medium">
+                                        Remove Photo
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -186,7 +197,7 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <form id="basic-info-form" method="POST" action="{{ route('profile.update') }}">
+                    <form method="POST" action="{{ route('profile.update') }}">
                         @csrf
                         @method('PATCH')
                         
@@ -197,9 +208,6 @@
                                 </label>
                                 <input type="text" name="name" value="{{ old('name', $user->name) }}" required
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                                @error('name')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
                             </div>
 
                             <div>
@@ -208,9 +216,6 @@
                                 </label>
                                 <input type="email" name="email" value="{{ old('email', $user->email) }}" required
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                                @error('email')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
                             </div>
 
                             <div>
@@ -220,9 +225,6 @@
                                 <input type="tel" name="mobile" value="{{ old('mobile', $user->mobile) }}"
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white"
                                        placeholder="98XXXXXXXX">
-                                @error('mobile')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
                             </div>
 
                             <div>
@@ -231,9 +233,6 @@
                                 </label>
                                 <input type="date" name="date_of_birth" value="{{ old('date_of_birth', $user->date_of_birth) }}"
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                                @error('date_of_birth')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
                             </div>
 
                             <div>
@@ -271,22 +270,24 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Your headline appears next to your name in search results. Make it compelling!
-                    </p>
-                    <div class="flex gap-3">
-                        <input type="text" id="headline-input" value="{{ $user->headline }}"
-                               placeholder="e.g. Senior Laravel Developer | 5+ Years Experience | React Specialist"
-                               class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        <button type="button" 
-                                onclick="updateHeadline()"
-                                class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
-                            Save
-                        </button>
-                    </div>
-                    <p class="mt-2 text-xs text-gray-500">
-                        <span id="headline-count">{{ strlen($user->headline ?? '') }}</span>/255 characters
-                    </p>
+                    <form method="POST" action="{{ route('profile.headline.update') }}">
+                        @csrf
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Your headline appears next to your name in search results. Make it compelling!
+                        </p>
+                        <div class="flex gap-3">
+                            <input type="text" name="headline" value="{{ $user->headline }}"
+                                   placeholder="e.g. Senior Laravel Developer | 5+ Years Experience | React Specialist"
+                                   class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
+                            <button type="submit" 
+                                    class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
+                                Save
+                            </button>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500">
+                            {{ strlen($user->headline ?? '') }}/255 characters
+                        </p>
+                    </form>
                 </div>
             </section>
 
@@ -301,22 +302,24 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Write a brief summary of your experience, skills, and career goals. 200-500 words recommended.
-                    </p>
-                    <textarea id="summary-input" rows="6"
-                              placeholder="Experienced professional with a passion for..."
-                              class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white resize-y">{{ $user->summary }}</textarea>
-                    <div class="mt-3 flex justify-between items-center">
-                        <p class="text-xs text-gray-500">
-                            <span id="summary-count">{{ strlen($user->summary ?? '') }}</span>/5000 characters
+                    <form method="POST" action="{{ route('profile.summary.update') }}">
+                        @csrf
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Write a brief summary of your experience, skills, and career goals. 200-500 words recommended.
                         </p>
-                        <button type="button" 
-                                onclick="updateSummary()"
-                                class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">
-                            Save Summary
-                        </button>
-                    </div>
+                        <textarea name="summary" rows="6"
+                                  placeholder="Experienced professional with a passion for..."
+                                  class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white resize-y">{{ $user->summary }}</textarea>
+                        <div class="mt-3 flex justify-between items-center">
+                            <p class="text-xs text-gray-500">
+                                {{ strlen($user->summary ?? '') }}/5000 characters
+                            </p>
+                            <button type="submit" 
+                                    class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">
+                                Save Summary
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </section>
 
@@ -331,41 +334,38 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Add your key skills. These help employers find you in searches.
-                    </p>
-                    
-                    {{-- Skills Tags --}}
-                    <div class="flex flex-wrap gap-2 mb-4 min-h-[60px] p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl" id="skills-container">
-                        @foreach($userSkills as $skill)
-                            <span class="inline-flex items-center px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm">
-                                {{ $skill }}
-                                <button type="button" onclick="removeSkill('{{ $skill }}')" class="ml-2 hover:text-blue-600">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </span>
-                        @endforeach
-                        @if(empty($userSkills))
-                            <p class="text-gray-500 text-sm">No skills added yet. Add your first skill below.</p>
+                    <form method="POST" action="{{ route('profile.skills.update') }}">
+                        @csrf
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Add your key skills separated by commas. These help employers find you in searches.
+                        </p>
+                        
+                        {{-- Skills Display --}}
+                        @if($user->skills->count() > 0)
+                            <div class="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                                @foreach($user->skills as $skill)
+                                    <span class="inline-flex items-center px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm">
+                                        {{ $skill->name }}
+                                    </span>
+                                @endforeach
+                            </div>
                         @endif
-                    </div>
 
-                    {{-- Add Skill Input --}}
-                    <div class="flex gap-2">
-                        <input type="text" id="new-skill-input" 
-                               placeholder="e.g. Laravel, React, Project Management"
-                               class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        <button type="button" 
-                                onclick="addSkill()"
-                                class="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium">
-                            Add
-                        </button>
-                    </div>
-                    <p class="mt-2 text-xs text-gray-500">
-                        Press Enter or click Add to add a skill. Click on skills to remove.
-                    </p>
+                        {{-- Skills Input --}}
+                        <div class="flex gap-2">
+                            <input type="text" name="skills" 
+                                   value="{{ implode(', ', $user->skills->pluck('name')->toArray()) }}"
+                                   placeholder="e.g. Laravel, React, Project Management, PHP, MySQL"
+                                   class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
+                            <button type="submit" 
+                                    class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
+                                Update Skills
+                            </button>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500">
+                            Enter skills separated by commas (e.g., Laravel, React, PHP)
+                        </p>
+                    </form>
                 </div>
             </section>
 
@@ -379,17 +379,16 @@
                         </svg>
                         Education
                     </h2>
-                    <button type="button" 
-                            onclick="showEducationModal()"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                    <a href="{{ route('education.create') }}?return=profile" 
+                       class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
                         + Add Education
-                    </button>
+                    </a>
                 </div>
                 <div class="p-6">
                     @if($user->education->count() > 0)
-                        <div class="space-y-4" id="education-list">
+                        <div class="space-y-4">
                             @foreach($user->education as $edu)
-                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 relative education-item" data-id="{{ $edu->id }}">
+                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 relative">
                                     <div class="flex justify-between">
                                         <div>
                                             <h3 class="font-semibold text-gray-900 dark:text-white">{{ $edu->degree }} in {{ $edu->field_of_study }}</h3>
@@ -403,16 +402,20 @@
                                             @endif
                                         </div>
                                         <div class="flex gap-2">
-                                            <button onclick="editEducation({{ $edu->id }})" class="text-gray-500 hover:text-blue-600">
+                                            <a href="{{ route('education.edit', $edu) }}?return=profile" class="text-gray-500 hover:text-blue-600">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
-                                            </button>
-                                            <button onclick="deleteEducation({{ $edu->id }})" class="text-gray-500 hover:text-red-600">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                                            </a>
+                                            <form method="POST" action="{{ route('education.destroy', $edu) }}" class="inline" onsubmit="return confirm('Delete this education entry?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-gray-500 hover:text-red-600">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </form>
                                         </div>
                                     </div>
                                 </div>
@@ -433,17 +436,16 @@
                         </svg>
                         Work Experience
                     </h2>
-                    <button type="button" 
-                            onclick="showExperienceModal()"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                    <a href="{{ route('experience.create') }}?return=profile" 
+                       class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
                         + Add Experience
-                    </button>
+                    </a>
                 </div>
                 <div class="p-6">
                     @if($user->experience->count() > 0)
-                        <div class="space-y-4" id="experience-list">
+                        <div class="space-y-4">
                             @foreach($user->experience as $exp)
-                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 relative experience-item" data-id="{{ $exp->id }}">
+                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 relative">
                                     <div class="flex justify-between">
                                         <div>
                                             <h3 class="font-semibold text-gray-900 dark:text-white">{{ $exp->position }}</h3>
@@ -457,16 +459,20 @@
                                             @endif
                                         </div>
                                         <div class="flex gap-2">
-                                            <button onclick="editExperience({{ $exp->id }})" class="text-gray-500 hover:text-blue-600">
+                                            <a href="{{ route('experience.edit', $exp) }}?return=profile" class="text-gray-500 hover:text-blue-600">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
-                                            </button>
-                                            <button onclick="deleteExperience({{ $exp->id }})" class="text-gray-500 hover:text-red-600">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                                            </a>
+                                            <form method="POST" action="{{ route('experience.destroy', $exp) }}" class="inline" onsubmit="return confirm('Delete this experience entry?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-gray-500 hover:text-red-600">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </form>
                                         </div>
                                     </div>
                                 </div>
@@ -489,9 +495,9 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center" id="resume-upload-area">
+                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center">
                         @if($user->resume_path)
-                            <div id="resume-info" class="mb-4">
+                            <div class="mb-4">
                                 <svg class="w-12 h-12 mx-auto text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -503,10 +509,14 @@
                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
                                     View Resume
                                 </a>
-                                <button onclick="deleteResume()"
-                                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
-                                    Delete Resume
-                                </button>
+                                <form method="POST" action="{{ route('profile.resume.delete') }}" class="inline" onsubmit="return confirm('Delete your resume?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                                        Delete Resume
+                                    </button>
+                                </form>
                             </div>
                         @else
                             <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,12 +524,14 @@
                             </svg>
                             <p class="text-gray-600 dark:text-gray-400 mb-2">Upload your resume (PDF, DOC, DOCX)</p>
                             <p class="text-sm text-gray-500 mb-4">Max file size: 5MB</p>
-                            <input type="file" id="resume-input" accept=".pdf,.doc,.docx" class="hidden">
-                            <button type="button" 
-                                    onclick="document.getElementById('resume-input').click()"
-                                    class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
-                                Choose File
-                            </button>
+                            <form method="POST" action="{{ route('profile.resume.upload') }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="file" name="resume" id="resume-input" accept=".pdf,.doc,.docx" class="hidden" onchange="this.form.submit()">
+                                <button type="button" onclick="document.getElementById('resume-input').click()" 
+                                        class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
+                                    Choose File
+                                </button>
+                            </form>
                         @endif
                     </div>
                 </div>
@@ -537,19 +549,18 @@
                     </h2>
                 </div>
                 <div class="p-6">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Set your job preferences to get better recommendations
-                    </p>
-                    
-                    <form id="preferences-form">
+                    <form method="POST" action="{{ route('profile.preferences.update') }}">
                         @csrf
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Set your job preferences to get better recommendations
+                        </p>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Preferred Locations
                                 </label>
-                                <input type="text" id="preferred-locations" 
+                                <input type="text" name="preferred_locations" 
                                        value="{{ $preferences['preferred_locations'] ?? '' }}"
                                        placeholder="e.g. Kathmandu, Pokhara, Remote"
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
@@ -559,7 +570,7 @@
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Expected Salary (Monthly)
                                 </label>
-                                <input type="number" id="expected-salary" 
+                                <input type="text" name="expected_salary" 
                                        value="{{ $preferences['expected_salary'] ?? '' }}"
                                        placeholder="e.g. 50000"
                                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
@@ -573,9 +584,10 @@
                                     @foreach($jobTypes as $value => $label)
                                         <label class="flex items-center">
                                             <input type="checkbox" 
+                                                   name="job_types[]" 
                                                    value="{{ $value }}" 
                                                    {{ in_array($value, $preferences['job_types'] ?? []) ? 'checked' : '' }}
-                                                   class="job-type-checkbox w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 dark:bg-gray-700">
+                                                   class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 dark:bg-gray-700">
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ $label }}</span>
                                         </label>
                                     @endforeach
@@ -584,19 +596,18 @@
 
                             <div class="md:col-span-2">
                                 <label class="flex items-center">
-                                    <input type="checkbox" id="open-to-relocation" 
-                                           {{ ($preferences['open_to_relocation'] ?? false) ? 'checked' : '' }}
+                                    <input type="checkbox" name="fresher" value="1" 
+                                           {{ ($preferences['fresher'] ?? false) ? 'checked' : '' }}
                                            class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 dark:bg-gray-700">
                                     <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                                        I am open to relocation
+                                        I am a fresher (entry level)
                                     </span>
                                 </label>
                             </div>
                         </div>
 
                         <div class="mt-6 flex justify-end">
-                            <button type="button" 
-                                    onclick="updatePreferences()"
+                            <button type="submit" 
                                     class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
                                 Save Preferences
                             </button>
@@ -605,779 +616,26 @@
                 </div>
             </section>
 
-            {{-- Save All Button --}}
+            {{-- Save All Button (just scrolls to top) --}}
             <div class="flex justify-end sticky bottom-6">
-                <button type="button" 
-                        onclick="saveAllSections()"
-                        class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-lg transition-colors">
-                    Save All Changes
-                </button>
+                <a href="#top" 
+                   class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-lg transition-colors">
+                    Back to Top
+                </a>
             </div>
-        </div>
-    </div>
-</div>
-
-{{-- Education Modal --}}
-<div id="education-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white" id="education-modal-title">Add Education</h3>
-            <button onclick="hideEducationModal()" class="text-gray-500 hover:text-gray-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <div class="p-6">
-            <form id="education-form">
-                @csrf
-                <input type="hidden" id="education-id">
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Degree *</label>
-                        <input type="text" id="degree" required
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Field of Study *</label>
-                        <input type="text" id="field-of-study" required
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Institution *</label>
-                        <input type="text" id="institution" required
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
-                        <input type="text" id="location"
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date *</label>
-                            <input type="date" id="start-date" required
-                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
-                            <input type="date" id="end-date"
-                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="flex items-center">
-                            <input type="checkbox" id="is-current" class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">I am currently studying here</span>
-                        </label>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                        <textarea id="description" rows="4"
-                                  class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white resize-y"></textarea>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" 
-                            onclick="hideEducationModal()"
-                            class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors">
-                        Save Education
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{{-- Experience Modal --}}
-<div id="experience-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white" id="experience-modal-title">Add Experience</h3>
-            <button onclick="hideExperienceModal()" class="text-gray-500 hover:text-gray-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <div class="p-6">
-            <form id="experience-form">
-                @csrf
-                <input type="hidden" id="experience-id">
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Job Title *</label>
-                        <input type="text" id="position" required
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company Name *</label>
-                        <input type="text" id="company-name" required
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
-                        <input type="text" id="experience-location"
-                               class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date *</label>
-                            <input type="date" id="experience-start-date" required
-                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
-                            <input type="date" id="experience-end-date"
-                                   class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="flex items-center">
-                            <input type="checkbox" id="experience-is-current" class="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
-                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">I currently work here</span>
-                        </label>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                        <textarea id="experience-description" rows="4"
-                                  class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white resize-y"
-                                  placeholder="Describe your responsibilities and achievements..."></textarea>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" 
-                            onclick="hideExperienceModal()"
-                            class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors">
-                        Save Experience
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
 @endsection
 
+{{-- Minimal JavaScript only for file inputs and confirmations --}}
 @section('scripts')
 <script>
-// Profile Completion Update
-function updateProfileCompletion() {
-    fetch('{{ route("profile.completion") }}')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('completion-percentage').textContent = data.completion + '%';
-                document.getElementById('completion-bar').style.width = data.completion + '%';
-                document.getElementById('completion-message').textContent = data.message;
-            }
-        });
+// Only used for file input triggers (these don't affect functionality)
+function triggerFileInput(id) {
+    document.getElementById(id).click();
 }
 
-// Photo Upload
-document.getElementById('photo-input').addEventListener('change', function(e) {
-    if (this.files && this.files[0]) {
-        uploadPhoto();
-    }
-});
-
-function uploadPhoto() {
-    const file = document.getElementById('photo-input').files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('_token', '{{ csrf_token() }}');
-
-    fetch('{{ route("profile.photo.update") }}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('profile-photo-preview').src = data.photo_url + '?t=' + Date.now();
-            document.getElementById('photo-status').innerHTML = '✓';
-            document.getElementById('photo-status').className = 'ml-auto text-xs text-green-600';
-            updateProfileCompletion();
-            showNotification('success', data.message);
-        }
-    });
-}
-
-function removePhoto() {
-    if (!confirm('Are you sure you want to remove your profile photo?')) return;
-
-    fetch('{{ route("profile.photo.remove") }}', {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('profile-photo-preview').src = '{{ asset("images/default-avatar.png") }}';
-            document.getElementById('photo-status').innerHTML = '○';
-            document.getElementById('photo-status').className = 'ml-auto text-xs text-gray-400';
-            updateProfileCompletion();
-            showNotification('success', data.message);
-        }
-    });
-}
-
-// Headline
-document.getElementById('headline-input').addEventListener('input', function() {
-    document.getElementById('headline-count').textContent = this.value.length;
-});
-
-function updateHeadline() {
-    const headline = document.getElementById('headline-input').value;
-
-    fetch('{{ route("profile.headline.update") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ headline: headline })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('success', data.message);
-            updateProfileCompletion();
-        }
-    });
-}
-
-// Summary
-document.getElementById('summary-input').addEventListener('input', function() {
-    document.getElementById('summary-count').textContent = this.value.length;
-});
-
-function updateSummary() {
-    const summary = document.getElementById('summary-input').value;
-
-    fetch('{{ route("profile.summary.update") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ summary: summary })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('success', data.message);
-            updateProfileCompletion();
-        }
-    });
-}
-
-// Skills
-document.getElementById('new-skill-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        addSkill();
-    }
-});
-
-function addSkill() {
-    const input = document.getElementById('new-skill-input');
-    const skill = input.value.trim();
-    
-    if (skill === '') {
-        showNotification('error', 'Please enter a skill');
-        return;
-    }
-
-    // Get current skills
-    const skills = [];
-    document.querySelectorAll('#skills-container span').forEach(span => {
-        const skillText = span.textContent.trim();
-        if (skillText !== 'No skills added yet. Add your first skill below.') {
-            skills.push(skillText);
-        }
-    });
-    
-    if (!skills.includes(skill)) {
-        skills.push(skill);
-        saveSkills(skills);
-        input.value = '';
-    } else {
-        showNotification('error', 'This skill already exists');
-    }
-}
-
-function removeSkill(skill) {
-    const skills = [];
-    document.querySelectorAll('#skills-container span').forEach(span => {
-        const skillText = span.textContent.trim();
-        if (skillText !== skill && skillText !== 'No skills added yet. Add your first skill below.') {
-            skills.push(skillText);
-        }
-    });
-    saveSkills(skills);
-}
-
-function saveSkills(skills) {
-    fetch('{{ route("profile.skills.update") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ skills: skills })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            renderSkills(data.skills);
-            updateProfileCompletion();
-            showNotification('success', data.message);
-        }
-    });
-}
-
-function renderSkills(skills) {
-    const container = document.getElementById('skills-container');
-    if (skills.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-sm">No skills added yet. Add your first skill below.</p>';
-        return;
-    }
-
-    let html = '';
-    skills.forEach(skill => {
-        html += `<span class="inline-flex items-center px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm">
-            ${skill}
-            <button type="button" onclick="removeSkill('${skill}')" class="ml-2 hover:text-blue-600">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </span>`;
-    });
-    container.innerHTML = html;
-}
-
-// Education
-// Reset education form when opening for new entry
-function showEducationModal() {
-    document.getElementById('education-form').reset();
-    document.getElementById('education-id').value = '';
-    document.getElementById('is-current').checked = false;
-    document.getElementById('education-modal-title').textContent = 'Add Education';
-    document.getElementById('education-modal').classList.remove('hidden');
-    document.getElementById('education-modal').classList.add('flex');
-}
-
-
-function hideEducationModal() {
-    document.getElementById('education-modal').classList.add('hidden');
-    document.getElementById('education-modal').classList.remove('flex');
-}
-
-document.getElementById('education-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const educationId = document.getElementById('education-id').value;
-    const url = educationId ? `/education/${educationId}` : '{{ route("education.store") }}';
-    const method = educationId ? 'PUT' : 'POST';
-
-    const formData = {
-        _token: '{{ csrf_token() }}',
-        degree: document.getElementById('degree').value,
-        field_of_study: document.getElementById('field-of-study').value,
-        institution: document.getElementById('institution').value,
-        location: document.getElementById('location').value,
-        start_date: document.getElementById('start-date').value,
-        end_date: document.getElementById('end-date').value,
-        is_current: document.getElementById('is-current').checked,
-        description: document.getElementById('description').value
-    };
-
-    fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            hideEducationModal();
-            location.reload(); // Simple reload for now
-        }
-    });
-});
-
-function editEducation(id) {
-    fetch(`/education/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('education-id').value = data.education.id;
-                document.getElementById('degree').value = data.education.degree;
-                document.getElementById('field-of-study').value = data.education.field_of_study;
-                document.getElementById('institution').value = data.education.institution;
-                document.getElementById('location').value = data.education.location || '';
-                document.getElementById('start-date').value = data.education.start_date;
-                document.getElementById('end-date').value = data.education.end_date || '';
-                document.getElementById('is-current').checked = data.education.is_current == 1;
-                document.getElementById('description').value = data.education.description || '';
-                
-                document.getElementById('education-modal-title').textContent = 'Edit Education';
-                document.getElementById('education-modal').classList.remove('hidden');
-                document.getElementById('education-modal').classList.add('flex');
-            }
-        })
-        .catch(error => {
-            showNotification('error', 'Failed to load education data');
-        });
-}
-function deleteEducation(id) {
-    if (!confirm('Are you sure you want to delete this education entry?')) return;
-
-    fetch(`/education/${id}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
-// Update education form submission
-document.getElementById('education-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const educationId = document.getElementById('education-id').value;
-    const url = educationId ? `/education/${educationId}` : '{{ route("education.store") }}';
-    const method = educationId ? 'PUT' : 'POST';
-
-    const formData = {
-        degree: document.getElementById('degree').value,
-        field_of_study: document.getElementById('field-of-study').value,
-        institution: document.getElementById('institution').value,
-        location: document.getElementById('location').value,
-        start_date: document.getElementById('start-date').value,
-        end_date: document.getElementById('end-date').value,
-        is_current: document.getElementById('is-current').checked ? 1 : 0,
-        description: document.getElementById('description').value
-    };
-
-    fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            hideEducationModal();
-            showNotification('success', data.message);
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showNotification('error', data.message || 'Operation failed');
-        }
-    })
-    .catch(error => {
-        showNotification('error', 'Network error. Please try again.');
-    });
-});
-
-// Update experience form submission
-document.getElementById('experience-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const experienceId = document.getElementById('experience-id').value;
-    const url = experienceId ? `/experience/${experienceId}` : '{{ route("experience.store") }}';
-    const method = experienceId ? 'PUT' : 'POST';
-
-    const formData = {
-        position: document.getElementById('position').value,
-        company_name: document.getElementById('company-name').value,
-        location: document.getElementById('experience-location').value,
-        start_date: document.getElementById('experience-start-date').value,
-        end_date: document.getElementById('experience-end-date').value,
-        is_current: document.getElementById('experience-is-current').checked ? 1 : 0,
-        description: document.getElementById('experience-description').value
-    };
-
-    fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            hideExperienceModal();
-            showNotification('success', data.message);
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showNotification('error', data.message || 'Operation failed');
-        }
-    })
-    .catch(error => {
-        showNotification('error', 'Network error. Please try again.');
-    });
-});
-
-// Experience
-function showExperienceModal() {
-    document.getElementById('experience-form').reset();
-    document.getElementById('experience-id').value = '';
-    document.getElementById('experience-is-current').checked = false;
-    document.getElementById('experience-modal-title').textContent = 'Add Experience';
-    document.getElementById('experience-modal').classList.remove('hidden');
-    document.getElementById('experience-modal').classList.add('flex');
-}
-
-function hideExperienceModal() {
-    document.getElementById('experience-modal').classList.add('hidden');
-    document.getElementById('experience-modal').classList.remove('flex');
-}
-
-document.getElementById('experience-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const experienceId = document.getElementById('experience-id').value;
-    const url = experienceId ? `/experience/${experienceId}` : '{{ route("experience.store") }}';
-    const method = experienceId ? 'PUT' : 'POST';
-
-    const formData = {
-        _token: '{{ csrf_token() }}',
-        position: document.getElementById('position').value,
-        company_name: document.getElementById('company-name').value,
-        location: document.getElementById('experience-location').value,
-        start_date: document.getElementById('experience-start-date').value,
-        end_date: document.getElementById('experience-end-date').value,
-        is_current: document.getElementById('experience-is-current').checked,
-        description: document.getElementById('experience-description').value
-    };
-
-    fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            hideExperienceModal();
-            location.reload(); // Simple reload for now
-        }
-    });
-});
-
-// Edit Experience
-function editExperience(id) {
-    fetch(`/experience/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('experience-id').value = data.experience.id;
-                document.getElementById('position').value = data.experience.position;
-                document.getElementById('company-name').value = data.experience.company_name;
-                document.getElementById('experience-location').value = data.experience.location || '';
-                document.getElementById('experience-start-date').value = data.experience.start_date;
-                document.getElementById('experience-end-date').value = data.experience.end_date || '';
-                document.getElementById('experience-is-current').checked = data.experience.is_current == 1;
-                document.getElementById('experience-description').value = data.experience.description || '';
-                
-                document.getElementById('experience-modal-title').textContent = 'Edit Experience';
-                document.getElementById('experience-modal').classList.remove('hidden');
-                document.getElementById('experience-modal').classList.add('flex');
-            }
-        })
-        .catch(error => {
-            showNotification('error', 'Failed to load experience data');
-        });
-}
-
-function deleteExperience(id) {
-    if (!confirm('Are you sure you want to delete this experience entry?')) return;
-
-    fetch(`/experience/${id}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
-
-// Resume
-document.getElementById('resume-input').addEventListener('change', function(e) {
-    if (this.files && this.files[0]) {
-        uploadResume();
-    }
-});
-
-function uploadResume() {
-    const file = document.getElementById('resume-input').files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('resume', file);
-    formData.append('_token', '{{ csrf_token() }}');
-
-    fetch('{{ route("profile.resume.upload") }}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
-
-function deleteResume() {
-    if (!confirm('Are you sure you want to delete your resume?')) return;
-
-    fetch('{{ route("profile.resume.delete") }}', {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
-
-// Preferences
-function updatePreferences() {
-    const jobTypes = [];
-    document.querySelectorAll('.job-type-checkbox:checked').forEach(cb => {
-        jobTypes.push(cb.value);
-    });
-
-    const data = {
-        _token: '{{ csrf_token() }}',
-        preferred_locations: document.getElementById('preferred-locations').value,
-        job_types: jobTypes,
-        expected_salary: document.getElementById('expected-salary').value,
-        open_to_relocation: document.getElementById('open-to-relocation').checked
-    };
-
-    fetch('{{ route("profile.preferences.update") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('success', data.message);
-            updateProfileCompletion();
-        }
-    });
-}
-
-// Save All Sections
-function saveAllSections() {
-    // Submit all forms
-    document.getElementById('basic-info-form').submit();
-    
-    // Other sections are saved via AJAX, so we just show a message
-    showNotification('info', 'All changes saved successfully!');
-}
-
-// Notification System
-function showNotification(type, message) {
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg z-50 ${
-        type === 'success' ? 'bg-green-500' : 
-        type === 'error' ? 'bg-red-500' : 
-        'bg-blue-500'
-    } text-white`;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
-}
-
-// Character counters
-document.addEventListener('DOMContentLoaded', function() {
-    // Highlight active section on scroll
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('.section-nav-link');
-    
-    window.addEventListener('scroll', () => {
-        let current = '';
-        sections.forEach(section => {
-            const sectionTop = section.offsetTop - 150;
-            if (pageYOffset >= sectionTop) {
-                current = section.getAttribute('id');
-            }
-        });
-        
-        navLinks.forEach(link => {
-            link.classList.remove('text-red-600', 'font-medium');
-            if (link.getAttribute('href') === `#${current}`) {
-                link.classList.add('text-red-600', 'font-medium');
-            }
-        });
-    });
-});
+// Confirm dialogs are handled by onsubmit attributes
 </script>
 @endsection

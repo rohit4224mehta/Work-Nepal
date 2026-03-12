@@ -1,25 +1,17 @@
 <?php
+// app/Models/Company.php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class Company extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<string>
-     */
     protected $fillable = [
         'name',
         'slug',
@@ -32,134 +24,93 @@ class Company extends Model
         'owner_id',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'verification_status' => 'string',
-        'created_at'          => 'datetime',
-        'updated_at'          => 'datetime',
-        'deleted_at'          => 'datetime',
     ];
 
-    /**
-     * Default attributes.
-     *
-     * @var array
-     */
-    protected $attributes = [
-        'verification_status' => 'pending',
-    ];
-
-    // -------------------------------------------------------------------------
-    //  Relationships
-    // -------------------------------------------------------------------------
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($company) {
+            if (empty($company->slug)) {
+                $company->slug = Str::slug($company->name);
+            }
+        });
+    }
 
     /**
-     * The user who owns/created this company
+     * Get the owner of the company.
      */
-    public function owner(): BelongsTo
+    public function owner()
     {
         return $this->belongsTo(User::class, 'owner_id');
     }
 
     /**
-     * All users who belong to this company (including owner)
+     * Get the users associated with this company.
      */
-    public function users(): BelongsToMany
+    public function users()
     {
         return $this->belongsToMany(User::class, 'company_user')
-            ->withPivot('role', 'is_active')
-            ->withTimestamps();
+                    ->withPivot('role', 'is_active')
+                    ->withTimestamps();
     }
 
     /**
-     * Currently active members only
+     * Get the job postings for this company.
      */
-    public function activeMembers(): BelongsToMany
-    {
-        return $this->users()->wherePivot('is_active', true);
-    }
-
-    /**
-     * All job postings created under this company
-     */
-    public function jobPostings(): HasMany
+    public function jobPostings()
     {
         return $this->hasMany(JobPosting::class);
     }
 
-    // -------------------------------------------------------------------------
-    //  Accessors & Mutators
-    // -------------------------------------------------------------------------
-
     /**
-     * Get the full URL to the company logo
+     * Get active job postings.
      */
-    protected function logoUrl(): Attribute
+    public function activeJobs()
     {
-        return Attribute::make(
-            get: fn (?string $value): string => $value
-                ? asset('storage/' . $value)
-                : $this->defaultLogoUrl(),
-        );
+        return $this->hasMany(JobPosting::class)
+                    ->where('status', 'active')
+                    ->whereDate('deadline', '>=', now());
     }
 
     /**
-     * Fallback logo when none is uploaded
+     * Get the logo URL attribute.
      */
-    protected function defaultLogoUrl(): string
+    public function getLogoUrlAttribute()
     {
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) .
-               '&background=0D8ABC&color=fff&size=256&bold=true';
+        return $this->logo_path
+            ? asset('storage/' . $this->logo_path)
+            : asset('images/default-company.png');
     }
 
     /**
-     * Is this company verified?
+     * Scope a query to only include verified companies.
      */
-    public function isVerified(): bool
-    {
-        return $this->verification_status === 'verified';
-    }
-
-    // -------------------------------------------------------------------------
-    //  Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Generate a unique slug from company name
-     */
-    public static function generateUniqueSlug(string $name): string
-    {
-        $slug = Str::slug($name);
-        $original = $slug;
-        $count = 1;
-
-        while (static::where('slug', $slug)->exists()) {
-            $slug = $original . '-' . $count++;
-        }
-
-        return $slug;
-    }
-
-    // -------------------------------------------------------------------------
-    //  Scopes
-    // -------------------------------------------------------------------------
-
     public function scopeVerified($query)
     {
         return $query->where('verification_status', 'verified');
     }
 
+    /**
+     * Scope a query to only include pending companies.
+     */
     public function scopePending($query)
     {
         return $query->where('verification_status', 'pending');
     }
 
-    public function scopeActive($query)
+    /**
+     * Get the verification badge color.
+     */
+    public function getVerificationBadgeAttribute()
     {
-        return $query->whereNull('deleted_at');
+        return match($this->verification_status) {
+            'verified' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            'pending' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            default => 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+        };
     }
 }

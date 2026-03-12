@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Experience extends Model
 {
     use HasFactory;
+
+    protected $table = 'experiences';
 
     protected $fillable = [
         'user_id',
@@ -27,16 +28,21 @@ class Experience extends Model
         'is_current' => 'boolean',
     ];
 
-    public function user(): BelongsTo
+    /**
+     * Get the user that owns the experience record.
+     */
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    public function getDurationAttribute(): string
+    /**
+     * Get formatted duration.
+     */
+    public function getDurationAttribute()
     {
-        $start = $this->start_date ? $this->start_date->format('M Y') : 'N/A';
-        $end = $this->is_current ? 'Present' : ($this->end_date ? $this->end_date->format('M Y') : 'N/A');
-
-        return "$start - $end";
+        $start = $this->start_date->format('M Y');
+        $end = $this->is_current ? 'Present' : $this->end_date->format('M Y');
+        return $start . ' - ' . $end;
     }
 }

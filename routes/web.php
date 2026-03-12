@@ -80,42 +80,44 @@ require __DIR__.'/verification.php';
 
 // Basic auth-required routes (edit profile, etc. — no verification needed to access edit form)
 Route::middleware('auth')->group(function () {
-    // Main profile edit page
+     // Main profile edit page
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     
-    // Basic info update (form submit)
+    // Basic info update
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     
     // Photo routes
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
     Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
     
-    // Headline & Summary (AJAX)
+    // Headline & Summary
     Route::post('/profile/headline', [ProfileController::class, 'updateHeadline'])->name('profile.headline.update');
     Route::post('/profile/summary', [ProfileController::class, 'updateSummary'])->name('profile.summary.update');
     
-    // Skills (AJAX)
+    // Skills
     Route::post('/profile/skills', [ProfileController::class, 'updateSkills'])->name('profile.skills.update');
     
     // Resume routes
     Route::post('/profile/resume', [ProfileController::class, 'uploadResume'])->name('profile.resume.upload');
     Route::delete('/profile/resume', [ProfileController::class, 'deleteResume'])->name('profile.resume.delete');
     
-    // Job Preferences (AJAX)
+    // Job Preferences
     Route::post('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
     
-    // Profile completion (AJAX)
+    // Profile completion (optional AJAX)
     Route::get('/profile/completion', [ProfileController::class, 'getCompletionData'])->name('profile.completion');
     
-    // Education CRUD
+    // Education routes
+    Route::get('/education/create', [ProfileController::class, 'createEducation'])->name('education.create');
     Route::post('/education', [ProfileController::class, 'storeEducation'])->name('education.store');
-    Route::get('/education/{id}', [ProfileController::class, 'getEducation'])->name('education.get');
+    Route::get('/education/{id}/edit', [ProfileController::class, 'editEducation'])->name('education.edit');
     Route::put('/education/{id}', [ProfileController::class, 'updateEducation'])->name('education.update');
     Route::delete('/education/{id}', [ProfileController::class, 'destroyEducation'])->name('education.destroy');
     
-    // Experience CRUD
+    // Experience routes
+    Route::get('/experience/create', [ProfileController::class, 'createExperience'])->name('experience.create');
     Route::post('/experience', [ProfileController::class, 'storeExperience'])->name('experience.store');
-    Route::get('/experience/{id}', [ProfileController::class, 'getExperience'])->name('experience.get');
+    Route::get('/experience/{id}/edit', [ProfileController::class, 'editExperience'])->name('experience.edit');
     Route::put('/experience/{id}', [ProfileController::class, 'updateExperience'])->name('experience.update');
     Route::delete('/experience/{id}', [ProfileController::class, 'destroyExperience'])->name('experience.destroy');
     // Password routes

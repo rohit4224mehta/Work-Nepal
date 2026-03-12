@@ -12,23 +12,35 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
+    /**
+     * Display the user's profile (public view).
+     */
+    public function show(User $user): View
+    {
+        $user->loadMissing([
+            'education' => fn($q) => $q->orderBy('start_date', 'desc'),
+            'experience' => fn($q) => $q->orderBy('start_date', 'desc'),
+            'skills',
+            'jobPreference'
+        ]);
+
+        $isOwnProfile = auth()->check() && auth()->id() === $user->id;
+
+        return view('profile.show', compact('user', 'isOwnProfile'));
+    }
+
     /**
      * Show the form for editing the user's profile.
      */
     public function edit(): View
     {
         $user = auth()->user()->loadMissing([
-            'education' => function ($query) {
-                $query->orderBy('start_date', 'desc');
-            },
-            'experience' => function ($query) {
-                $query->orderBy('start_date', 'desc');
-            },
+            'education' => fn($q) => $q->orderBy('start_date', 'desc'),
+            'experience' => fn($q) => $q->orderBy('start_date', 'desc'),
             'skills',
             'jobPreference'
         ]);
@@ -231,17 +243,10 @@ class ProfileController extends Controller
             $path = $request->file('photo')->store('profile-photos', 'public');
             $user->update(['profile_photo_path' => $path]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Profile photo updated successfully!',
-                'photo_url' => $user->profile_photo_url
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Profile photo updated successfully!');
         } catch (\Exception $e) {
             Log::error('Photo upload error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to upload photo. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to upload photo. Please try again.');
         }
     }
 
@@ -258,16 +263,10 @@ class ProfileController extends Controller
                 $user->update(['profile_photo_path' => null]);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Profile photo removed successfully.'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Profile photo removed successfully.');
         } catch (\Exception $e) {
             Log::error('Photo removal error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to remove photo. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to remove photo. Please try again.');
         }
     }
 
@@ -283,16 +282,10 @@ class ProfileController extends Controller
 
             auth()->user()->update(['headline' => $request->headline]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Headline updated successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Headline updated successfully!');
         } catch (\Exception $e) {
             Log::error('Headline update error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update headline. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to update headline. Please try again.');
         }
     }
 
@@ -308,16 +301,10 @@ class ProfileController extends Controller
 
             auth()->user()->update(['summary' => $request->summary]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Summary updated successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Summary updated successfully!');
         } catch (\Exception $e) {
             Log::error('Summary update error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update summary. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to update summary. Please try again.');
         }
     }
 
@@ -328,8 +315,7 @@ class ProfileController extends Controller
     {
         try {
             $request->validate([
-                'skills' => 'nullable|array',
-                'skills.*' => 'string|max:50',
+                'skills' => 'nullable|string',
             ]);
 
             $user = auth()->user();
@@ -337,9 +323,10 @@ class ProfileController extends Controller
             // Clear existing skills
             $user->skills()->detach();
             
-            if ($request->has('skills') && !empty($request->skills)) {
-                foreach ($request->skills as $skillName) {
-                    $skillName = trim($skillName);
+            if ($request->filled('skills')) {
+                $skillNames = array_map('trim', explode(',', $request->skills));
+                
+                foreach ($skillNames as $skillName) {
                     if (!empty($skillName)) {
                         // Create slug from skill name
                         $slug = \Illuminate\Support\Str::slug($skillName);
@@ -355,20 +342,10 @@ class ProfileController extends Controller
                 }
             }
 
-            // Reload skills
-            $user->load('skills');
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Skills updated successfully!',
-                'skills' => $user->skills->pluck('name')
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Skills updated successfully!');
         } catch (\Exception $e) {
             Log::error('Skills update error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update skills. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to update skills. Please try again.');
         }
     }
 
@@ -391,18 +368,10 @@ class ProfileController extends Controller
             $path = $request->file('resume')->store('resumes', 'public');
             $user->update(['resume_path' => $path]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Resume uploaded successfully!',
-                'file_name' => $request->file('resume')->getClientOriginalName(),
-                'file_size' => $request->file('resume')->getSize(),
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Resume uploaded successfully!');
         } catch (\Exception $e) {
             Log::error('Resume upload error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to upload resume. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to upload resume. Please try again.');
         }
     }
 
@@ -419,16 +388,10 @@ class ProfileController extends Controller
                 $user->update(['resume_path' => null]);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Resume deleted successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Resume deleted successfully!');
         } catch (\Exception $e) {
             Log::error('Resume deletion error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete resume. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to delete resume. Please try again.');
         }
     }
 
@@ -453,7 +416,7 @@ class ProfileController extends Controller
                               implode(',', $request->job_types) : null;
             
             // Update or create job preference
-            $preference = JobPreference::updateOrCreate(
+            JobPreference::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'preferred_location' => $request->preferred_locations,
@@ -463,23 +426,28 @@ class ProfileController extends Controller
                 ]
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Job preferences updated successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Job preferences updated successfully!');
         } catch (\Exception $e) {
             Log::error('Preferences update error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update preferences. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to update preferences. Please try again.');
         }
     }
 
-    // ────────────────────────────────────────────────
-    // Education CRUD
-    // ────────────────────────────────────────────────
+    // ============================================
+    // EDUCATION METHODS
+    // ============================================
 
+    /**
+     * Show form to create education
+     */
+    public function createEducation()
+    {
+        return view('profile.education-form', ['education' => null]);
+    }
+
+    /**
+     * Store education record
+     */
     public function storeEducation(Request $request)
     {
         try {
@@ -491,7 +459,7 @@ class ProfileController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_current' => 'sometimes|boolean',
-                'description' => 'nullable|string|max:2000',
+                'description' => 'nullable|string',
             ]);
 
             if ($request->boolean('is_current')) {
@@ -500,22 +468,33 @@ class ProfileController extends Controller
 
             $validated['user_id'] = auth()->id();
             
-            $education = Education::create($validated);
+            Education::create($validated);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Education added successfully!',
-                'education' => $education
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Education added successfully!');
         } catch (\Exception $e) {
             Log::error('Store education error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to add education. Please try again.'
-            ], 500);
+            return back()->withInput()->with('error', 'Failed to add education. Please try again.');
         }
     }
 
+    /**
+     * Show form to edit education
+     */
+    public function editEducation($id)
+    {
+        $education = Education::findOrFail($id);
+        
+        // Check authorization
+        if ($education->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        return view('profile.education-form', compact('education'));
+    }
+
+    /**
+     * Update education record
+     */
     public function updateEducation(Request $request, $id)
     {
         try {
@@ -523,10 +502,7 @@ class ProfileController extends Controller
             
             // Check authorization
             if ($education->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized action.'
-                ], 403);
+                abort(403, 'Unauthorized action.');
             }
 
             $validated = $request->validate([
@@ -537,7 +513,7 @@ class ProfileController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_current' => 'sometimes|boolean',
-                'description' => 'nullable|string|max:2000',
+                'description' => 'nullable|string',
             ]);
 
             if ($request->boolean('is_current')) {
@@ -546,20 +522,16 @@ class ProfileController extends Controller
 
             $education->update($validated);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Education updated successfully!',
-                'education' => $education
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Education updated successfully!');
         } catch (\Exception $e) {
             Log::error('Update education error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update education. Please try again.'
-            ], 500);
+            return back()->withInput()->with('error', 'Failed to update education. Please try again.');
         }
     }
 
+    /**
+     * Delete education record
+     */
     public function destroyEducation($id)
     {
         try {
@@ -567,31 +539,33 @@ class ProfileController extends Controller
             
             // Check authorization
             if ($education->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized action.'
-                ], 403);
+                abort(403, 'Unauthorized action.');
             }
             
             $education->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Education removed successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Education removed successfully!');
         } catch (\Exception $e) {
             Log::error('Delete education error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete education. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to delete education. Please try again.');
         }
     }
 
-    // ────────────────────────────────────────────────
-    // Experience CRUD
-    // ────────────────────────────────────────────────
+    // ============================================
+    // EXPERIENCE METHODS
+    // ============================================
 
+    /**
+     * Show form to create experience
+     */
+    public function createExperience()
+    {
+        return view('profile.experience-form', ['experience' => null]);
+    }
+
+    /**
+     * Store experience record
+     */
     public function storeExperience(Request $request)
     {
         try {
@@ -602,7 +576,7 @@ class ProfileController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_current' => 'sometimes|boolean',
-                'description' => 'nullable|string|max:5000',
+                'description' => 'nullable|string',
             ]);
 
             if ($request->boolean('is_current')) {
@@ -611,22 +585,33 @@ class ProfileController extends Controller
 
             $validated['user_id'] = auth()->id();
             
-            $experience = Experience::create($validated);
+            Experience::create($validated);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Experience added successfully!',
-                'experience' => $experience
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Experience added successfully!');
         } catch (\Exception $e) {
             Log::error('Store experience error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to add experience. Please try again.'
-            ], 500);
+            return back()->withInput()->with('error', 'Failed to add experience. Please try again.');
         }
     }
 
+    /**
+     * Show form to edit experience
+     */
+    public function editExperience($id)
+    {
+        $experience = Experience::findOrFail($id);
+        
+        // Check authorization
+        if ($experience->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        return view('profile.experience-form', compact('experience'));
+    }
+
+    /**
+     * Update experience record
+     */
     public function updateExperience(Request $request, $id)
     {
         try {
@@ -634,10 +619,7 @@ class ProfileController extends Controller
             
             // Check authorization
             if ($experience->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized action.'
-                ], 403);
+                abort(403, 'Unauthorized action.');
             }
 
             $validated = $request->validate([
@@ -647,7 +629,7 @@ class ProfileController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_current' => 'sometimes|boolean',
-                'description' => 'nullable|string|max:5000',
+                'description' => 'nullable|string',
             ]);
 
             if ($request->boolean('is_current')) {
@@ -656,20 +638,16 @@ class ProfileController extends Controller
 
             $experience->update($validated);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Experience updated successfully!',
-                'experience' => $experience
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Experience updated successfully!');
         } catch (\Exception $e) {
             Log::error('Update experience error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update experience. Please try again.'
-            ], 500);
+            return back()->withInput()->with('error', 'Failed to update experience. Please try again.');
         }
     }
 
+    /**
+     * Delete experience record
+     */
     public function destroyExperience($id)
     {
         try {
@@ -677,29 +655,20 @@ class ProfileController extends Controller
             
             // Check authorization
             if ($experience->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized action.'
-                ], 403);
+                abort(403, 'Unauthorized action.');
             }
             
             $experience->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Experience removed successfully!'
-            ]);
+            return redirect()->route('profile.edit')->with('success', 'Experience removed successfully!');
         } catch (\Exception $e) {
             Log::error('Delete experience error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete experience. Please try again.'
-            ], 500);
+            return redirect()->route('profile.edit')->with('error', 'Failed to delete experience. Please try again.');
         }
     }
 
     /**
-     * Get profile completion data for AJAX
+     * Get profile completion data for AJAX (optional)
      */
     public function getCompletionData()
     {
@@ -733,60 +702,6 @@ class ProfileController extends Controller
             return 'You\'re on your way! Complete your profile to get better job matches.';
         } else {
             return 'Add skills, experience & preferences to reach 80%+ completion.';
-        }
-    }
-
-    /**
-     * Get single education record
-     */
-    public function getEducation($id)
-    {
-        try {
-            $education = Education::findOrFail($id);
-            
-            if ($education->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized access.'
-                ], 403);
-            }
-
-            return response()->json([
-                'success' => true,
-                'education' => $education
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Education record not found.'
-            ], 404);
-        }
-    }
-
-    /**
-     * Get single experience record
-     */
-    public function getExperience($id)
-    {
-        try {
-            $experience = Experience::findOrFail($id);
-            
-            if ($experience->user_id !== auth()->id()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized access.'
-                ], 403);
-            }
-
-            return response()->json([
-                'success' => true,
-                'experience' => $experience
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Experience record not found.'
-            ], 404);
         }
     }
 }

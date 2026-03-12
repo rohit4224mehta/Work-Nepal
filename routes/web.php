@@ -4,9 +4,11 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\Dashboard\JobSeekerDashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JobController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\JobSeeker\SavedJobController;
+use App\Http\Controllers\CompaniesController;
 
 use App\Http\Controllers\ApplicationController;
 use Illuminate\Support\Facades\Route;
@@ -39,9 +41,11 @@ Route::prefix('jobs')->name('jobs.')->group(function () {
 
 // Companies (public profiles)
 Route::prefix('companies')->name('companies.')->group(function () {
-    Route::get('/{company:slug}', [CompanyController::class, 'show'])->name('show');
+    Route::get('/', [CompaniesController::class, 'index'])->name('index');
+    Route::get('/search/suggestions', [CompaniesController::class, 'suggestions'])->name('suggestions');
+    Route::get('/industry/{industry}', [CompaniesController::class, 'byIndustry'])->name('industry');
+    Route::get('/{slug}', [CompaniesController::class, 'show'])->name('show');
 });
-
 // Static Pages
 
 // Pages Routes
@@ -122,6 +126,18 @@ Route::middleware('auth')->group(function () {
     Route::delete('/experience/{id}', [ProfileController::class, 'destroyExperience'])->name('experience.destroy');
     // Password routes
     Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
+});
+
+
+// Settings Routes
+Route::middleware(['auth'])->prefix('settings')->name('settings.')->group(function () {
+    Route::get('/', [SettingsController::class, 'index'])->name('index');
+    Route::put('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/password', [SettingsController::class, 'updatePassword'])->name('password.update');
+    Route::put('/notifications', [SettingsController::class, 'updateNotifications'])->name('notifications.update');
+    Route::put('/privacy', [SettingsController::class, 'updatePrivacy'])->name('privacy.update');
+    Route::get('/delete/confirm', [SettingsController::class, 'confirmDelete'])->name('delete.confirm');
+    Route::delete('/account', [SettingsController::class, 'deleteAccount'])->name('account.delete');
 });
 
 // Full verification + account active required for actions that modify data

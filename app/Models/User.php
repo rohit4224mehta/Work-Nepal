@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -11,6 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Support\Enums\AccountStatus;
+
 use App\Support\Enums\Gender;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -53,13 +55,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'account_status' => AccountStatus::ACTIVE,
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Accessors & Mutators
-    |--------------------------------------------------------------------------
-    */
+/*
+|--------------------------------------------------------------------------
+| Accessors & Mutators
+|--------------------------------------------------------------------------
+*/
 
-    protected function profilePhotoUrl(): Attribute
+protected function profilePhotoUrl(): Attribute
     {
         return Attribute::make(
             get: fn (?string $value): string =>

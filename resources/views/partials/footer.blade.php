@@ -47,7 +47,8 @@
             <div>
                 <h6 class="text-lg font-semibold text-white mb-5">Support</h6>
                 <ul class="space-y-3">
-                    <li><a href="#" class="hover:text-red-600 transition-colors">Help Center</a></li>
+                    <li><a href="{{ route('pages.help-center') }}" class="hover:text-red-600 transition-colors">Help Center</a></li>
+                    <li><a href="{{ route('pages.about') }}" class="hover:text-red-600 transition-colors">About Us</a></li>
                     <li><a href="{{ route('pages.contact') }}" class="hover:text-red-600 transition-colors">Contact Us</a></li>
                     <li><a href="{{ route('pages.terms') }}" class="hover:text-red-600 transition-colors">Terms of Service</a></li>
                     <li><a href="{{ route('pages.privacy') }}" class="hover:text-red-600 transition-colors">Privacy Policy</a></li>

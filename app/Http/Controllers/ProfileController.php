@@ -5,33 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Education;
 use App\Models\Experience;
+use App\Models\Skill;
+use App\Models\JobPreference;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
-use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile (public view).
-     */
-    public function show(User $user): View
-    {
-        $isOwnProfile = auth()->check() && auth()->id() === $user->id;
-
-        // Load relations safely with ordering
-        $user->loadMissing([
-            'education' => fn($q) => $q->orderBy('start_date', 'desc'),
-            'experience' => fn($q) => $q->orderBy('start_date', 'desc'),
-        ]);
-
-        return view('profile.show', compact('user', 'isOwnProfile'));
-    }
-
-    /**
-     * Show the profile edit form.
+     * Show the form for editing the user's profile.
      */
     public function edit(): View
     {
@@ -42,19 +29,43 @@ class ProfileController extends Controller
             'experience' => function ($query) {
                 $query->orderBy('start_date', 'desc');
             },
-            'skills'
+            'skills',
+            'jobPreference'
         ]);
 
         // Calculate dynamic profile completion
         $completion = $this->calculateProfileCompletion($user);
 
-        // Get skills as comma-separated string for the form
-        $skillsString = $user->skills->pluck('name')->implode(', ');
+        // Get skills as array for the form
+        $userSkills = $user->skills->pluck('name')->toArray();
 
-        // Parse preferences
-        $preferences = $user->preferences ? json_decode($user->preferences, true) : [];
+        // Get job preferences from job_preferences table
+        $preferences = [
+            'preferred_locations' => $user->jobPreference->preferred_location ?? '',
+            'job_types' => $user->jobPreference ? 
+                          ($user->jobPreference->preferred_job_type ? 
+                           explode(',', $user->jobPreference->preferred_job_type) : []) : [],
+            'expected_salary' => $user->jobPreference->expected_salary ?? '',
+            'fresher' => $user->jobPreference->fresher ?? false,
+        ];
 
-        return view('profile.edit', compact('user', 'skillsString', 'preferences', 'completion'));
+        // Job types options
+        $jobTypes = [
+            'full-time' => 'Full Time',
+            'part-time' => 'Part Time',
+            'contract' => 'Contract',
+            'internship' => 'Internship',
+            'remote' => 'Remote',
+            'freelance' => 'Freelance',
+        ];
+
+        return view('profile.edit', compact(
+            'user', 
+            'completion', 
+            'userSkills', 
+            'preferences',
+            'jobTypes'
+        ));
     }
 
     /**
@@ -64,183 +75,652 @@ class ProfileController extends Controller
     {
         $score = 0;
         $weights = [
-            'name' => 5,
-            'profile_photo' => 10,
-            'mobile' => 8,
-            'email_verified' => 7,
-            'date_of_birth' => 5,
-            'gender' => 5,
-            'headline' => 15,
-            'summary' => 15,
+            'photo' => 10,
+            'basic_info' => 10,
+            'headline' => 10,
+            'summary' => 10,
+            'skills' => 15,
             'education' => 15,
             'experience' => 15,
-            'skills' => 10,
+            'resume' => 10,
             'preferences' => 5,
         ];
 
-        // Basic Information (35 points total)
-        if ($user->name) $score += $weights['name'];
-        
+        // Photo (10%)
         if ($user->profile_photo_path) {
-            $score += $weights['profile_photo'];
-        } else {
-            // Check if using default avatar
-            $defaultAvatars = ['default-avatar.png', 'default-avatar.jpg', 'default-profile.png'];
-            $isDefault = false;
-            
-            if ($user->profile_photo_url) {
-                foreach ($defaultAvatars as $default) {
-                    if (str_contains($user->profile_photo_url, $default)) {
-                        $isDefault = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (!$isDefault && $user->profile_photo_url) {
-                $score += $weights['profile_photo'];
-            }
-        }
-        
-        if ($user->mobile) $score += $weights['mobile'];
-        if ($user->email_verified_at) $score += $weights['email_verified'];
-        if ($user->date_of_birth) $score += $weights['date_of_birth'];
-        
-        if ($user->gender && $user->gender !== 'prefer_not_to_say') {
-            $score += $weights['gender'];
+            $score += $weights['photo'];
         }
 
-        // Professional Information (30 points total)
+        // Basic Info (10%) - name, email, mobile, gender, dob
+        $basicInfoScore = 0;
+        if ($user->name) $basicInfoScore += 2;
+        if ($user->email) $basicInfoScore += 2;
+        if ($user->mobile) $basicInfoScore += 2;
+        if ($user->gender && $user->gender !== 'prefer_not_to_say') $basicInfoScore += 2;
+        if ($user->date_of_birth) $basicInfoScore += 2;
+        $score += min($weights['basic_info'], $basicInfoScore);
+
+        // Headline (10%)
         if ($user->headline) {
-            // Bonus for more detailed headline (word count)
             $wordCount = str_word_count($user->headline);
             if ($wordCount >= 5) {
-                $score += $weights['headline']; // Full points for detailed headline
+                $score += $weights['headline'];
             } elseif ($wordCount >= 3) {
-                $score += ($weights['headline'] * 0.7); // 70% for decent headline
+                $score += ($weights['headline'] * 0.7);
             } else {
-                $score += ($weights['headline'] * 0.4); // 40% for basic headline
+                $score += ($weights['headline'] * 0.4);
             }
         }
 
+        // Summary (10%)
         if ($user->summary) {
-            // Bonus for longer summaries
             $charCount = strlen($user->summary);
             if ($charCount >= 500) {
-                $score += $weights['summary']; // Full points for detailed summary
+                $score += $weights['summary'];
             } elseif ($charCount >= 200) {
-                $score += ($weights['summary'] * 0.7); // 70% for medium summary
+                $score += ($weights['summary'] * 0.7);
             } elseif ($charCount >= 50) {
-                $score += ($weights['summary'] * 0.4); // 40% for short summary
+                $score += ($weights['summary'] * 0.4);
             }
         }
 
-        // Education (15 points total)
-        if ($user->education && $user->education->count() > 0) {
-            $educationScore = 0;
-            foreach ($user->education as $edu) {
-                // Check completeness of each education entry
-                $entryScore = 0;
-                if ($edu->degree) $entryScore += 2;
-                if ($edu->field_of_study) $entryScore += 2;
-                if ($edu->institution) $entryScore += 2;
-                if ($edu->start_date) $entryScore += 2;
-                if ($edu->description && strlen($edu->description) > 50) $entryScore += 2;
-                
-                $educationScore += min(10, $entryScore); // Max 10 per entry
-            }
-            
-            // Average of all entries, max 15 points
-            $averageScore = ($educationScore / $user->education->count()) * 1.5;
-            $score += min($weights['education'], $averageScore);
-        }
-
-        // Experience (15 points total)
-        if ($user->experience && $user->experience->count() > 0) {
-            $experienceScore = 0;
-            foreach ($user->experience as $exp) {
-                // Check completeness of each experience entry
-                $entryScore = 0;
-                if ($exp->position) $entryScore += 2;
-                if ($exp->company_name) $entryScore += 2;
-                if ($exp->start_date) $entryScore += 2;
-                if ($exp->description && strlen($exp->description) > 50) $entryScore += 2;
-                if ($exp->end_date || $exp->is_current) $entryScore += 2;
-                
-                $experienceScore += min(10, $entryScore); // Max 10 per entry
-            }
-            
-            // Average of all entries, max 15 points
-            $averageScore = ($experienceScore / $user->experience->count()) * 1.5;
-            $score += min($weights['experience'], $averageScore);
-        }
-
-        // Skills (10 points total)
+        // Skills (15%)
         if ($user->skills && $user->skills->count() > 0) {
             $skillCount = $user->skills->count();
             if ($skillCount >= 8) {
-                $score += $weights['skills']; // Full points for 8+ skills
+                $score += $weights['skills'];
             } elseif ($skillCount >= 5) {
-                $score += ($weights['skills'] * 0.7); // 70% for 5-7 skills
+                $score += ($weights['skills'] * 0.7);
             } elseif ($skillCount >= 3) {
-                $score += ($weights['skills'] * 0.4); // 40% for 3-4 skills
+                $score += ($weights['skills'] * 0.4);
             } elseif ($skillCount >= 1) {
-                $score += ($weights['skills'] * 0.2); // 20% for 1-2 skills
+                $score += ($weights['skills'] * 0.2);
             }
         }
 
-        // Job Preferences (5 points total)
-        if ($user->preferences) {
-            $preferences = is_string($user->preferences) ? json_decode($user->preferences, true) : $user->preferences;
-            
-            if (is_array($preferences)) {
-                $prefScore = 0;
-                if (!empty($preferences['preferred_locations'])) $prefScore += 2;
-                if (!empty($preferences['job_types']) && count($preferences['job_types']) > 0) $prefScore += 1.5;
-                if (!empty($preferences['expected_salary'])) $prefScore += 1.5;
-                
-                $score += min($weights['preferences'], $prefScore);
+        // Education (15%)
+        if ($user->education && $user->education->count() > 0) {
+            $educationScore = 0;
+            foreach ($user->education as $edu) {
+                $entryScore = 0;
+                if ($edu->degree) $entryScore += 3;
+                if ($edu->field_of_study) $entryScore += 3;
+                if ($edu->institution) $entryScore += 3;
+                if ($edu->start_date) $entryScore += 3;
+                if ($edu->description) $entryScore += 3;
+                $educationScore += min(15, $entryScore);
             }
+            $averageScore = ($educationScore / $user->education->count());
+            $score += min($weights['education'], $averageScore);
         }
 
-        // Cap at 100 and round
+        // Experience (15%)
+        if ($user->experience && $user->experience->count() > 0) {
+            $experienceScore = 0;
+            foreach ($user->experience as $exp) {
+                $entryScore = 0;
+                if ($exp->position) $entryScore += 3;
+                if ($exp->company_name) $entryScore += 3;
+                if ($exp->start_date) $entryScore += 3;
+                if ($exp->description) $entryScore += 3;
+                if ($exp->end_date || $exp->is_current) $entryScore += 3;
+                $experienceScore += min(15, $entryScore);
+            }
+            $averageScore = ($experienceScore / $user->experience->count());
+            $score += min($weights['experience'], $averageScore);
+        }
+
+        // Resume (10%)
+        if ($user->resume_path) {
+            $score += $weights['resume'];
+        }
+
+        // Preferences (5%)
+        if ($user->jobPreference) {
+            $prefScore = 0;
+            if ($user->jobPreference->preferred_location) $prefScore += 2;
+            if ($user->jobPreference->preferred_job_type) $prefScore += 2;
+            if ($user->jobPreference->expected_salary) $prefScore += 1;
+            $score += min($weights['preferences'], $prefScore);
+        }
+
         return min(100, (int) round($score));
     }
 
     /**
-     * Get detailed completion breakdown for API/JS usage
+     * Update the user's basic profile information.
      */
-    public function getCompletionBreakdown(): \Illuminate\Http\JsonResponse
+    public function update(Request $request)
     {
-        $user = auth()->user()->loadMissing(['education', 'experience', 'skills']);
-        
-        $breakdown = [
-            'name' => ['completed' => !empty($user->name), 'weight' => 5],
-            'profile_photo' => ['completed' => !empty($user->profile_photo_path), 'weight' => 10],
-            'mobile' => ['completed' => !empty($user->mobile), 'weight' => 8],
-            'email_verified' => ['completed' => !empty($user->email_verified_at), 'weight' => 7],
-            'date_of_birth' => ['completed' => !empty($user->date_of_birth), 'weight' => 5],
-            'gender' => ['completed' => ($user->gender && $user->gender !== 'prefer_not_to_say'), 'weight' => 5],
-            'headline' => ['completed' => !empty($user->headline), 'weight' => 15],
-            'summary' => ['completed' => !empty($user->summary), 'weight' => 15],
-            'education' => ['completed' => ($user->education && $user->education->count() > 0), 'weight' => 15],
-            'experience' => ['completed' => ($user->experience && $user->experience->count() > 0), 'weight' => 15],
-            'skills' => ['completed' => ($user->skills && $user->skills->count() > 0), 'weight' => 10],
-            'preferences' => ['completed' => !empty($user->preferences), 'weight' => 5],
-        ];
+        try {
+            $user = auth()->user();
 
-        $total = $this->calculateProfileCompletion($user);
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+                'gender' => ['nullable', 'in:male,female,other,prefer_not_to_say'],
+                'date_of_birth' => ['nullable', 'date', 'before:today'],
+                'mobile' => ['nullable', 'string', 'regex:/^[0-9]{10}$/', Rule::unique('users')->ignore($user->id)],
+            ]);
 
-        return response()->json([
-            'total' => $total,
-            'breakdown' => $breakdown,
-            'message' => $this->getCompletionMessage($total)
-        ]);
+            $user->update($validated);
+
+            return redirect()->route('profile.edit')->with('success', 'Basic information updated successfully!');
+        } catch (\Exception $e) {
+            Log::error('Profile update error: ' . $e->getMessage());
+            return redirect()->route('profile.edit')->with('error', 'Failed to update profile. Please try again.');
+        }
     }
 
     /**
-     * Get appropriate message based on completion percentage
+     * Update profile photo
      */
+    public function updatePhoto(Request $request)
+    {
+        try {
+            $request->validate([
+                'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            ]);
+
+            $user = auth()->user();
+
+            if ($user->profile_photo_path) {
+                Storage::disk('public')->delete($user->profile_photo_path);
+            }
+
+            $path = $request->file('photo')->store('profile-photos', 'public');
+            $user->update(['profile_photo_path' => $path]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile photo updated successfully!',
+                'photo_url' => $user->profile_photo_url
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Photo upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload photo. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove profile photo
+     */
+    public function removePhoto()
+    {
+        try {
+            $user = auth()->user();
+
+            if ($user->profile_photo_path) {
+                Storage::disk('public')->delete($user->profile_photo_path);
+                $user->update(['profile_photo_path' => null]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile photo removed successfully.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Photo removal error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove photo. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update professional headline
+     */
+    public function updateHeadline(Request $request)
+    {
+        try {
+            $request->validate([
+                'headline' => 'required|string|max:255',
+            ]);
+
+            auth()->user()->update(['headline' => $request->headline]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Headline updated successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Headline update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update headline. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update professional summary
+     */
+    public function updateSummary(Request $request)
+    {
+        try {
+            $request->validate([
+                'summary' => 'required|string|max:5000',
+            ]);
+
+            auth()->user()->update(['summary' => $request->summary]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Summary updated successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Summary update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update summary. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user skills
+     */
+    public function updateSkills(Request $request)
+    {
+        try {
+            $request->validate([
+                'skills' => 'nullable|array',
+                'skills.*' => 'string|max:50',
+            ]);
+
+            $user = auth()->user();
+            
+            // Clear existing skills
+            $user->skills()->detach();
+            
+            if ($request->has('skills') && !empty($request->skills)) {
+                foreach ($request->skills as $skillName) {
+                    $skillName = trim($skillName);
+                    if (!empty($skillName)) {
+                        // Create slug from skill name
+                        $slug = \Illuminate\Support\Str::slug($skillName);
+                        
+                        // Find or create skill
+                        $skill = Skill::firstOrCreate(
+                            ['name' => $skillName],
+                            ['slug' => $slug]
+                        );
+                        
+                        $user->skills()->attach($skill->id);
+                    }
+                }
+            }
+
+            // Reload skills
+            $user->load('skills');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Skills updated successfully!',
+                'skills' => $user->skills->pluck('name')
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Skills update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update skills. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload resume
+     */
+    public function uploadResume(Request $request)
+    {
+        try {
+            $request->validate([
+                'resume' => 'required|file|mimes:pdf,doc,docx|max:5120',
+            ]);
+
+            $user = auth()->user();
+
+            if ($user->resume_path) {
+                Storage::disk('public')->delete($user->resume_path);
+            }
+
+            $path = $request->file('resume')->store('resumes', 'public');
+            $user->update(['resume_path' => $path]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Resume uploaded successfully!',
+                'file_name' => $request->file('resume')->getClientOriginalName(),
+                'file_size' => $request->file('resume')->getSize(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Resume upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload resume. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete resume
+     */
+    public function deleteResume()
+    {
+        try {
+            $user = auth()->user();
+
+            if ($user->resume_path) {
+                Storage::disk('public')->delete($user->resume_path);
+                $user->update(['resume_path' => null]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Resume deleted successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Resume deletion error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete resume. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update job preferences
+     */
+    public function updatePreferences(Request $request)
+    {
+        try {
+            $request->validate([
+                'preferred_locations' => 'nullable|string|max:255',
+                'job_types' => 'nullable|array',
+                'job_types.*' => 'string|in:full-time,part-time,contract,internship,remote,freelance',
+                'expected_salary' => 'nullable|string|max:50',
+                'fresher' => 'nullable|boolean',
+            ]);
+
+            $user = auth()->user();
+            
+            // Convert job types array to comma-separated string
+            $jobTypesString = $request->has('job_types') && !empty($request->job_types) ? 
+                              implode(',', $request->job_types) : null;
+            
+            // Update or create job preference
+            $preference = JobPreference::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'preferred_location' => $request->preferred_locations,
+                    'preferred_job_type' => $jobTypesString,
+                    'expected_salary' => $request->expected_salary,
+                    'fresher' => $request->boolean('fresher'),
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Job preferences updated successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Preferences update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update preferences. Please try again.'
+            ], 500);
+        }
+    }
+
+    // ────────────────────────────────────────────────
+    // Education CRUD
+    // ────────────────────────────────────────────────
+
+    public function storeEducation(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'degree' => 'required|string|max:255',
+                'field_of_study' => 'required|string|max:255',
+                'institution' => 'required|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'is_current' => 'sometimes|boolean',
+                'description' => 'nullable|string|max:2000',
+            ]);
+
+            if ($request->boolean('is_current')) {
+                $validated['end_date'] = null;
+            }
+
+            $validated['user_id'] = auth()->id();
+            
+            $education = Education::create($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Education added successfully!',
+                'education' => $education
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Store education error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add education. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function updateEducation(Request $request, $id)
+    {
+        try {
+            $education = Education::findOrFail($id);
+            
+            // Check authorization
+            if ($education->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.'
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'degree' => 'required|string|max:255',
+                'field_of_study' => 'required|string|max:255',
+                'institution' => 'required|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'is_current' => 'sometimes|boolean',
+                'description' => 'nullable|string|max:2000',
+            ]);
+
+            if ($request->boolean('is_current')) {
+                $validated['end_date'] = null;
+            }
+
+            $education->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Education updated successfully!',
+                'education' => $education
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Update education error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update education. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function destroyEducation($id)
+    {
+        try {
+            $education = Education::findOrFail($id);
+            
+            // Check authorization
+            if ($education->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.'
+                ], 403);
+            }
+            
+            $education->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Education removed successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete education error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete education. Please try again.'
+            ], 500);
+        }
+    }
+
+    // ────────────────────────────────────────────────
+    // Experience CRUD
+    // ────────────────────────────────────────────────
+
+    public function storeExperience(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'position' => 'required|string|max:255',
+                'company_name' => 'required|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'is_current' => 'sometimes|boolean',
+                'description' => 'nullable|string|max:5000',
+            ]);
+
+            if ($request->boolean('is_current')) {
+                $validated['end_date'] = null;
+            }
+
+            $validated['user_id'] = auth()->id();
+            
+            $experience = Experience::create($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Experience added successfully!',
+                'experience' => $experience
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Store experience error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add experience. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function updateExperience(Request $request, $id)
+    {
+        try {
+            $experience = Experience::findOrFail($id);
+            
+            // Check authorization
+            if ($experience->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.'
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'position' => 'required|string|max:255',
+                'company_name' => 'required|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'is_current' => 'sometimes|boolean',
+                'description' => 'nullable|string|max:5000',
+            ]);
+
+            if ($request->boolean('is_current')) {
+                $validated['end_date'] = null;
+            }
+
+            $experience->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Experience updated successfully!',
+                'experience' => $experience
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Update experience error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update experience. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function destroyExperience($id)
+    {
+        try {
+            $experience = Experience::findOrFail($id);
+            
+            // Check authorization
+            if ($experience->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.'
+                ], 403);
+            }
+            
+            $experience->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Experience removed successfully!'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Delete experience error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete experience. Please try again.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get profile completion data for AJAX
+     */
+    public function getCompletionData()
+    {
+        try {
+            $user = auth()->user()->loadMissing(['education', 'experience', 'skills', 'jobPreference']);
+            $completion = $this->calculateProfileCompletion($user);
+
+            return response()->json([
+                'success' => true,
+                'completion' => $completion,
+                'message' => $this->getCompletionMessage($completion)
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Completion data error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get completion data.'
+            ], 500);
+        }
+    }
+
     private function getCompletionMessage(int $completion): string
     {
         if ($completion >= 90) {
@@ -257,299 +737,56 @@ class ProfileController extends Controller
     }
 
     /**
-     * Get skills as comma-separated string
+     * Get single education record
      */
-    private function getSkillsString(User $user): string
+    public function getEducation($id)
     {
-        if (!$user->skills) return '';
+        try {
+            $education = Education::findOrFail($id);
+            
+            if ($education->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access.'
+                ], 403);
+            }
 
-        if (is_string($user->skills)) {
-            $decoded = json_decode($user->skills, true);
-            return is_array($decoded) ? implode(', ', $decoded) : '';
+            return response()->json([
+                'success' => true,
+                'education' => $education
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Education record not found.'
+            ], 404);
         }
-
-        if (is_array($user->skills)) {
-            return implode(', ', $user->skills);
-        }
-
-        return '';
     }
 
     /**
-     * Update user's basic profile.
+     * Get single experience record
      */
-    public function update(Request $request)
+    public function getExperience($id)
     {
-        $user = auth()->user();
-
-        $validated = $request->validate([
-            'name'          => ['required', 'string', 'max:255'],
-            'gender'        => ['nullable', 'in:male,female,other,prefer_not_to_say'],
-            'date_of_birth' => ['nullable', 'date', 'before:-18 years'],
-            'mobile'        => ['nullable', 'regex:/^[0-9]{10}$/', Rule::unique('users')->ignore($user->id)],
-            'headline'      => ['nullable', 'string', 'max:150'],
-            'summary'       => ['nullable', 'string', 'max:5000'],
-            'photo'         => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
-            'resume'        => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
-            'skills'        => ['nullable', 'string'],
-        ]);
-
-        // Update core fields
-        $user->update($request->only([
-            'name', 'gender', 'date_of_birth', 'mobile', 'headline', 'summary'
-        ]));
-
-        // Skills - store as JSON array
-        if ($request->filled('skills')) {
-            $skills = array_filter(array_map('trim', explode(',', $request->skills)));
-            $user->update(['skills' => json_encode($skills)]);
-        }
-
-        // Photo
-        if ($request->hasFile('photo')) {
-            if ($user->profile_photo_path) {
-                Storage::disk('public')->delete($user->profile_photo_path);
+        try {
+            $experience = Experience::findOrFail($id);
+            
+            if ($experience->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized access.'
+                ], 403);
             }
-            $path = $request->file('photo')->store('profile-photos', 'public');
-            $user->update(['profile_photo_path' => $path]);
+
+            return response()->json([
+                'success' => true,
+                'experience' => $experience
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Experience record not found.'
+            ], 404);
         }
-
-        // Resume
-        if ($request->hasFile('resume')) {
-            if ($user->resume_path) {
-                Storage::disk('public')->delete($user->resume_path);
-            }
-            $path = $request->file('resume')->store('resumes', 'public');
-            $user->update(['resume_path' => $path]);
-        }
-
-        return redirect()->route('profile.show', $user)
-            ->with('success', 'Profile updated successfully!');
-    }
-
-    // ────────────────────────────────────────────────
-    // Photo Management (separate routes if needed)
-    // ────────────────────────────────────────────────
-
-    public function photo(): View
-    {
-        return view('profile.photo');
-    }
-
-    public function updatePhoto(Request $request)
-    {
-        $request->validate([
-            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ]);
-
-        $user = auth()->user();
-
-        if ($user->profile_photo_path) {
-            Storage::disk('public')->delete($user->profile_photo_path);
-        }
-
-        $path = $request->file('photo')->store('profile-photos', 'public');
-        $user->update(['profile_photo_path' => $path]);
-
-        return redirect()->route('profile.show', $user)
-            ->with('success', 'Profile photo updated!');
-    }
-
-    public function removePhoto()
-    {
-        $user = auth()->user();
-
-        if ($user->profile_photo_path) {
-            Storage::disk('public')->delete($user->profile_photo_path);
-            $user->update(['profile_photo_path' => null]);
-        }
-
-        return redirect()->route('profile.show', $user)
-            ->with('success', 'Profile photo removed.');
-    }
-
-    // ────────────────────────────────────────────────
-    // Password Change
-    // ────────────────────────────────────────────────
-
-    public function password(): View
-    {
-        return view('profile.password');
-    }
-
-    public function updatePassword(Request $request)
-    {
-        $request->validate([
-            'current_password' => ['required', function ($attribute, $value, $fail) {
-                if (!Hash::check($value, auth()->user()->password)) {
-                    $fail('Current password is incorrect.');
-                }
-            }],
-            'password' => ['required', 'confirmed', 'min:8', 'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/'],
-        ]);
-
-        auth()->user()->update([
-            'password' => Hash::make($request->password),
-        ]);
-
-        return redirect()->route('profile.show', auth()->user())
-            ->with('success', 'Password changed successfully!');
-    }
-
-    // ────────────────────────────────────────────────
-    // Education CRUD
-    // ────────────────────────────────────────────────
-
-    public function storeEducation(Request $request)
-    {
-        $validated = $request->validate([
-            'degree'         => 'required|string|max:255',
-            'field_of_study' => 'required|string|max:255',
-            'institution'    => 'required|string|max:255',
-            'location'       => 'nullable|string|max:255',
-            'start_date'     => 'required|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
-            'is_current'     => 'boolean',
-            'description'    => 'nullable|string|max:2000',
-        ]);
-
-        if ($request->boolean('is_current')) {
-            $validated['end_date'] = null;
-        }
-
-        auth()->user()->education()->create($validated);
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Education added successfully!');
-    }
-
-    public function updateEducation(Request $request, Education $education)
-    {
-        $this->authorize('update', $education);
-
-        $validated = $request->validate([
-            'degree'         => 'required|string|max:255',
-            'field_of_study' => 'required|string|max:255',
-            'institution'    => 'required|string|max:255',
-            'location'       => 'nullable|string|max:255',
-            'start_date'     => 'required|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
-            'is_current'     => 'boolean',
-            'description'    => 'nullable|string|max:2000',
-        ]);
-
-        if ($request->boolean('is_current')) {
-            $validated['end_date'] = null;
-        }
-
-        $education->update($validated);
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Education updated!');
-    }
-
-    public function destroyEducation(Education $education)
-    {
-        $this->authorize('delete', $education);
-
-        $education->delete();
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Education removed.');
-    }
-
-    // ────────────────────────────────────────────────
-    // Experience CRUD (mirror of Education)
-    // ────────────────────────────────────────────────
-
-    public function storeExperience(Request $request)
-    {
-        $validated = $request->validate([
-            'position'       => 'required|string|max:255',
-            'company'        => 'required|string|max:255',
-            'location'       => 'nullable|string|max:255',
-            'start_date'     => 'required|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
-            'is_current'     => 'boolean',
-            'description'    => 'nullable|string|max:5000',
-        ]);
-
-        if ($request->boolean('is_current')) {
-            $validated['end_date'] = null;
-        }
-
-        auth()->user()->experience()->create($validated);
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Experience added!');
-    }
-
-    public function updateExperience(Request $request, Experience $experience)
-    {
-        $this->authorize('update', $experience);
-
-        $validated = $request->validate([
-            'position'       => 'required|string|max:255',
-            'company'        => 'required|string|max:255',
-            'location'       => 'nullable|string|max:255',
-            'start_date'     => 'required|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
-            'is_current'     => 'boolean',
-            'description'    => 'nullable|string|max:5000',
-        ]);
-
-        if ($request->boolean('is_current')) {
-            $validated['end_date'] = null;
-        }
-
-        $experience->update($validated);
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Experience updated!');
-    }
-
-    public function destroyExperience(Experience $experience)
-    {
-        $this->authorize('delete', $experience);
-
-        $experience->delete();
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Experience removed.');
-    }
-
-    // ────────────────────────────────────────────────
-    // Delete Account (with confirmation)
-    // ────────────────────────────────────────────────
-
-    public function confirmDelete(): View
-    {
-        return view('profile.delete');
-    }
-
-    public function destroy(Request $request)
-    {
-        $request->validate([
-            'password' => ['required', function ($attribute, $value, $fail) {
-                if (!Hash::check($value, auth()->user()->password)) {
-                    $fail('The password is incorrect.');
-                }
-            }],
-        ]);
-
-        $user = auth()->user();
-
-        // Cleanup files
-        if ($user->profile_photo_path) {
-            Storage::disk('public')->delete($user->profile_photo_path);
-        }
-        if ($user->resume_path) {
-            Storage::disk('public')->delete($user->resume_path);
-        }
-
-        auth()->logout();
-        $user->delete();
-
-        return redirect('/')->with('success', 'Your account has been deleted.');
     }
 }

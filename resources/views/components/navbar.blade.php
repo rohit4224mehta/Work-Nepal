@@ -55,7 +55,7 @@
 
                         <!-- Job Seeker Quick Links -->
                         @role('job_seeker')
-                            {{-- <a href="{{ route('saved.jobs') ?? '#' }}"
+                            <a href="{{ route('saved.jobs') ?? '#' }}"
                                class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors flex items-center gap-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -69,11 +69,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 Applications
-                            </a> --}}
+                            </a>
                           
-                        <a href="#" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors">
-                            Saved Jobs
-                        </a>
+                        
                         @endrole
 
                         <!-- Employer Quick Actions -->
@@ -192,13 +190,13 @@
                 <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-5">
                     <!-- Role-specific links -->
                     @role('job_seeker')
-                        {{-- <a href="{{ route('saved.jobs') ?? '#' }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors">
+                        <a href="{{ route('saved.jobs') ?? '#' }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors">
                             Saved Jobs
                         </a>
                         
                         <a href="{{ route('applications.index') ?? '#' }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors">
                             Applications
-                        </a> --}}
+                        </a>
                         
                     @endrole
 

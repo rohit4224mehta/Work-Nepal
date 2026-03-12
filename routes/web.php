@@ -6,7 +6,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\EducationController;
+use App\Http\Controllers\JobSeeker\SavedJobController;
 
 use App\Http\Controllers\ApplicationController;
 use Illuminate\Support\Facades\Route;
@@ -43,13 +43,20 @@ Route::prefix('companies')->name('companies.')->group(function () {
 });
 
 // Static Pages
+
+// Pages Routes
 Route::prefix('pages')->name('pages.')->group(function () {
     Route::get('/about', [PageController::class, 'about'])->name('about');
     Route::get('/contact', [PageController::class, 'contact'])->name('contact');
+    Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
     Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
     Route::get('/terms', [PageController::class, 'terms'])->name('terms');
     Route::get('/cv-tips', [PageController::class, 'cvTips'])->name('cv-tips');
     Route::get('/foreign-safety', [PageController::class, 'foreignSafety'])->name('foreign-safety');
+    Route::get('/help-center', [PageController::class, 'helpCenter'])->name('help-center');
+    Route::get('/help-center/article/{category}/{index}', [PageController::class, 'getHelpArticle'])->name('help.article');
+    Route::post('/help-center/feedback', [PageController::class, 'submitHelpfulFeedback'])->name('help.feedback');
+    Route::post('/help-center/contact', [PageController::class, 'helpContact'])->name('help.contact');
 });
 
 // ────────────────────────────────────────────────
@@ -73,7 +80,44 @@ require __DIR__.'/verification.php';
 
 // Basic auth-required routes (edit profile, etc. — no verification needed to access edit form)
 Route::middleware('auth')->group(function () {
+    // Main profile edit page
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    
+    // Basic info update (form submit)
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    
+    // Photo routes
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+    Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
+    
+    // Headline & Summary (AJAX)
+    Route::post('/profile/headline', [ProfileController::class, 'updateHeadline'])->name('profile.headline.update');
+    Route::post('/profile/summary', [ProfileController::class, 'updateSummary'])->name('profile.summary.update');
+    
+    // Skills (AJAX)
+    Route::post('/profile/skills', [ProfileController::class, 'updateSkills'])->name('profile.skills.update');
+    
+    // Resume routes
+    Route::post('/profile/resume', [ProfileController::class, 'uploadResume'])->name('profile.resume.upload');
+    Route::delete('/profile/resume', [ProfileController::class, 'deleteResume'])->name('profile.resume.delete');
+    
+    // Job Preferences (AJAX)
+    Route::post('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
+    
+    // Profile completion (AJAX)
+    Route::get('/profile/completion', [ProfileController::class, 'getCompletionData'])->name('profile.completion');
+    
+    // Education CRUD
+    Route::post('/education', [ProfileController::class, 'storeEducation'])->name('education.store');
+    Route::get('/education/{id}', [ProfileController::class, 'getEducation'])->name('education.get');
+    Route::put('/education/{id}', [ProfileController::class, 'updateEducation'])->name('education.update');
+    Route::delete('/education/{id}', [ProfileController::class, 'destroyEducation'])->name('education.destroy');
+    
+    // Experience CRUD
+    Route::post('/experience', [ProfileController::class, 'storeExperience'])->name('experience.store');
+    Route::get('/experience/{id}', [ProfileController::class, 'getExperience'])->name('experience.get');
+    Route::put('/experience/{id}', [ProfileController::class, 'updateExperience'])->name('experience.update');
+    Route::delete('/experience/{id}', [ProfileController::class, 'destroyExperience'])->name('experience.destroy');
     // Password routes
     Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
 });
@@ -83,29 +127,13 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
     // Show profile (can be public or restricted later)
     Route::get('/profile/{user}', [ProfileController::class, 'show'])->name('profile.show');
 
-    // Update profile (save changes)
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-
-    // Photo routes
-    Route::get('/profile/photo', [ProfileController::class, 'photo'])->name('profile.photo');
-    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
-    Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
+  
 
     // Password routes
     Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
-    // Delete profile (dangerous)
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    // Education CRUD
-    Route::post('/education', [ProfileController::class, 'storeEducation'])->name('education.store');
-    Route::patch('/education/{education}', [ProfileController::class, 'updateEducation'])->name('education.update');
-    Route::delete('/education/{education}', [ProfileController::class, 'destroyEducation'])->name('education.destroy');
-
-    Route::post('/experience', [ProfileController::class, 'storeExperience'])->name('experience.store');
-Route::patch('/experience/{experience}', [ProfileController::class, 'updateExperience'])->name('experience.update');
-Route::delete('/experience/{experience}', [ProfileController::class, 'destroyExperience'])->name('experience.destroy');
+    
     // ────────────────────────────────────────────────
     // 5. Role-based Dashboards & Features
     // ────────────────────────────────────────────────
@@ -117,9 +145,11 @@ Route::delete('/experience/{experience}', [ProfileController::class, 'destroyExp
             
             // Future: applications, saved jobs, profile completion, etc.
             // Route::get('/applications', ...)->name('applications');
-            // Route::get('/saved-jobs', ...)->name('saved.jobs');
+            
         });
         Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
+         Route::get('/saved-jobs', [SavedJobController::class, 'index'])
+            ->name('saved.jobs');
     });
 
     // Employer Area
@@ -127,6 +157,11 @@ Route::delete('/experience/{experience}', [ProfileController::class, 'destroyExp
         // Dashboard
         // Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('/company/create', [CompanyController::class, 'create'])
+            ->name('company.create');
+
+        Route::post('/company/store', [CompanyController::class, 'store'])
+            ->name('company.store');
         // Job Management
         // Route::resource('jobs', EmployerJobController::class)->except(['show']);
 

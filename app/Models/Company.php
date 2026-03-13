@@ -17,14 +17,26 @@ class Company extends Model
         'slug',
         'description',
         'logo_path',
+        'cover_path',
         'website',
         'industry',
+        'size',
+        'founded_year',
         'location',
+        'headquarters',
+        'contact_email',
+        'phone',
         'verification_status',
         'owner_id',
+        'culture_images',
+        'video_link',
+        'social_links',
     ];
 
     protected $casts = [
+        'founded_year' => 'integer',
+        'culture_images' => 'array',
+        'social_links' => 'array',
         'verification_status' => 'string',
     ];
 
@@ -48,17 +60,25 @@ class Company extends Model
     }
 
     /**
-     * Get the users associated with this company.
+     * Get team members of the company.
      */
-    public function users()
+    public function teamMembers()
     {
-        return $this->belongsToMany(User::class, 'company_user')
-                    ->withPivot('role', 'is_active')
+        return $this->belongsToMany(User::class, 'company_team_members')
+                    ->withPivot('role', 'is_active', 'permissions')
                     ->withTimestamps();
     }
 
     /**
-     * Get the job postings for this company.
+     * Get active team members.
+     */
+    public function activeTeamMembers()
+    {
+        return $this->teamMembers()->wherePivot('is_active', true);
+    }
+
+    /**
+     * Get job postings for this company.
      */
     public function jobPostings()
     {
@@ -86,31 +106,31 @@ class Company extends Model
     }
 
     /**
-     * Scope a query to only include verified companies.
+     * Get the cover URL attribute.
      */
-    public function scopeVerified($query)
+    public function getCoverUrlAttribute()
     {
-        return $query->where('verification_status', 'verified');
+        return $this->cover_path
+            ? asset('storage/' . $this->cover_path)
+            : asset('images/default-cover.jpg');
     }
 
     /**
-     * Scope a query to only include pending companies.
+     * Check if user can manage this company.
      */
-    public function scopePending($query)
+    public function canUserManage(User $user): bool
     {
-        return $query->where('verification_status', 'pending');
-    }
-
-    /**
-     * Get the verification badge color.
-     */
-    public function getVerificationBadgeAttribute()
-    {
-        return match($this->verification_status) {
-            'verified' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            'pending' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            default => 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-        };
+        // Owner can always manage
+        if ($user->id === $this->owner_id) {
+            return true;
+        }
+        
+        // Check if user is active team member
+        $teamMember = $this->teamMembers()
+            ->where('user_id', $user->id)
+            ->wherePivot('is_active', true)
+            ->first();
+            
+        return !is_null($teamMember);
     }
 }

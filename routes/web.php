@@ -9,8 +9,12 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\JobSeeker\SavedJobController;
 use App\Http\Controllers\CompaniesController;
-
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\Employer\CompanyController as EmployerCompanyController;
+use App\Http\Controllers\Employer\JobController as EmployerJobController;
+use App\Http\Controllers\Employer\ApplicantController as EmployerApplicantController;
+use App\Http\Controllers\Employer\DashboardController as EmployerDashboardController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,7 +50,6 @@ Route::prefix('companies')->name('companies.')->group(function () {
     Route::get('/industry/{industry}', [CompaniesController::class, 'byIndustry'])->name('industry');
     Route::get('/{slug}', [CompaniesController::class, 'show'])->name('show');
 });
-// Static Pages
 
 // Pages Routes
 Route::prefix('pages')->name('pages.')->group(function () {
@@ -76,18 +79,13 @@ require __DIR__.'/auth.php';
 require __DIR__.'/verification.php';
 
 // ────────────────────────────────────────────────
-// 4. Protected Routes (must be logged in + email verified)
-// ────────────────────────────────────────────────
-    // ────────────────────────────────────────────────
-// Protected Routes (must be logged in)
+// 4. Protected Routes (must be logged in)
 // ────────────────────────────────────────────────
 
-// Basic auth-required routes (edit profile, etc. — no verification needed to access edit form)
 Route::middleware('auth')->group(function () {
-     // Main profile edit page
-    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     
-    // Basic info update
+    // Profile Management
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     
     // Photo routes
@@ -124,10 +122,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/experience/{id}/edit', [ProfileController::class, 'editExperience'])->name('experience.edit');
     Route::put('/experience/{id}', [ProfileController::class, 'updateExperience'])->name('experience.update');
     Route::delete('/experience/{id}', [ProfileController::class, 'destroyExperience'])->name('experience.destroy');
+    
     // Password routes
     Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+    
+    // Public profile view (anyone logged in can view)
+    Route::get('/profile/{user}', [ProfileController::class, 'show'])->name('profile.show');
 });
-
 
 // Settings Routes
 Route::middleware(['auth'])->prefix('settings')->name('settings.')->group(function () {
@@ -140,73 +142,121 @@ Route::middleware(['auth'])->prefix('settings')->name('settings.')->group(functi
     Route::delete('/account', [SettingsController::class, 'deleteAccount'])->name('account.delete');
 });
 
-// Full verification + account active required for actions that modify data
+// ────────────────────────────────────────────────
+// 5. Full Verification Required Routes
+// ────────────────────────────────────────────────
+
 Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
-    // Show profile (can be public or restricted later)
-    Route::get('/profile/{user}', [ProfileController::class, 'show'])->name('profile.show');
-
-  
-
-    // Password routes
-    Route::get('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
-    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
-
     
-    // ────────────────────────────────────────────────
-    // 5. Role-based Dashboards & Features
-    // ────────────────────────────────────────────────
+    // Job Seeker Routes
+    Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        Route::get('/', [JobSeekerDashboardController::class, 'index'])->name('jobseeker');
+    });
+    
+    // Applications
+    Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
+    Route::post('/jobs/{jobId}/apply', [ApplicationController::class, 'store'])->name('jobs.apply');
+    
+    // Saved Jobs
+    Route::prefix('saved-jobs')->name('saved.')->group(function () {
+        Route::get('/', [SavedJobController::class, 'index'])->name('jobs');
+        Route::post('/jobs/{jobId}/save', [SavedJobController::class, 'save'])->name('jobs.save');
+        Route::delete('/jobs/{jobId}/unsave', [SavedJobController::class, 'unsave'])->name('jobs.unsave');
+    });
 
-    // Job Seeker Area
-    Route::middleware('role:job_seeker')->group(function () {
-        Route::prefix('dashboard')->name('dashboard.')->group(function () {
-            Route::get('/', [JobSeekerDashboardController::class, 'index'])->name('jobseeker');
+    // ────────────────────────────────────────────────
+    // 6. Employer Routes (multi-step company creation)
+    // ────────────────────────────────────────────────
+    
+    Route::prefix('employer')->name('employer.')->group(function () {
+        
+        // Multi-step company creation (accessible to job_seekers AND employers)
+        Route::get('/company/create', [EmployerCompanyController::class, 'create'])->name('company.create');
+        Route::post('/company/step1', [EmployerCompanyController::class, 'storeStep1'])->name('company.store.step1');
+        
+        Route::get('/company/details', [EmployerCompanyController::class, 'details'])->name('company.details');
+        Route::post('/company/step2', [EmployerCompanyController::class, 'storeStep2'])->name('company.store.step2');
+        
+        Route::get('/company/branding', [EmployerCompanyController::class, 'branding'])->name('company.branding');
+        Route::post('/company/step3', [EmployerCompanyController::class, 'storeStep3'])->name('company.store.step3');
+        
+        Route::get('/company/review', [EmployerCompanyController::class, 'review'])->name('company.review');
+        Route::post('/company/final', [EmployerCompanyController::class, 'storeFinal'])->name('company.store.final');
+        
+        Route::get('/company/{company}/success', [EmployerCompanyController::class, 'success'])->name('company.success');
+        
+        Route::get('/company/{company}/preview', [EmployerCompanyController::class, 'preview'])
+        ->name('company.preview');
+        Route::get('/post-job', function() {
+        return redirect()->route('employer.jobs.create');
+    })->name('post.job');
+    Route::get('/applicants', function() {
+        return redirect()->route('employer.applicants.index');
+    })->name('applicants');
+
+
+        // Employer Dashboard (only employers can access)
+        Route::middleware(['role:employer'])->group(function () {
             
-            // Future: applications, saved jobs, profile completion, etc.
-            // Route::get('/applications', ...)->name('applications');
+            Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
             
+            // Job Management
+            Route::resource('jobs', EmployerJobController::class)->except(['show']);
+            Route::get('/jobs/{job}/applications', [EmployerJobController::class, 'applications'])->name('jobs.applications');
+            
+            // Applicants Management
+            Route::get('/applicants', [EmployerApplicantController::class, 'index'])->name('applicants.index');
+            Route::get('/applicants/{application}', [EmployerApplicantController::class, 'show'])->name('applicants.show');
+            Route::patch('/applicants/{application}/status', [EmployerApplicantController::class, 'updateStatus'])->name('applicants.status');
+            
+            // Team Management
+            Route::get('/company/{company}/team', [EmployerCompanyController::class, 'team'])->name('company.team');
+            Route::post('/company/{company}/team/add', [EmployerCompanyController::class, 'addTeamMember'])->name('company.team.add');
+            Route::delete('/company/{company}/team/{user}', [EmployerCompanyController::class, 'removeTeamMember'])->name('company.team.remove');
         });
-        Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
-         Route::get('/saved-jobs', [SavedJobController::class, 'index'])
-            ->name('saved.jobs');
     });
 
-    // Employer Area
-    Route::middleware(['role:employer'])->prefix('employer')->name('employer.')->group(function () {
-        // Dashboard
-        // Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
-
-        Route::get('/company/create', [CompanyController::class, 'create'])
-            ->name('company.create');
-
-        Route::post('/company/store', [CompanyController::class, 'store'])
-            ->name('company.store');
-        // Job Management
-        // Route::resource('jobs', EmployerJobController::class)->except(['show']);
-
-        // Company Management
-        // Route::get('/company/create', [CompanyController::class, 'create'])->name('company.create');
-        // Route::post('/company', [CompanyController::class, 'store'])->name('company.store');
-
-        // Applicants
-        // Route::get('/applicants', [EmployerApplicantController::class, 'index'])->name('applicants.index');
-    });
-
-    // Admin / Super Admin Area
+    // ────────────────────────────────────────────────
+    // 7. Admin / Super Admin Routes
+    // ────────────────────────────────────────────────
+    
     Route::middleware(['role:admin|super_admin'])->prefix('admin')->name('admin.')->group(function () {
         // Dashboard
-        // Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
 
         // Job Moderation
-        // Route::get('/jobs/pending', [AdminJobController::class, 'pending'])->name('jobs.pending');
-        // Route::post('/jobs/{job}/approve', [AdminJobController::class, 'approve'])->name('jobs.approve');
-        // Route::post('/jobs/{job}/reject', [AdminJobController::class, 'reject'])->name('jobs.reject');
+        Route::get('/jobs/pending', [AdminJobController::class, 'pending'])->name('jobs.pending');
+        Route::post('/jobs/{job}/approve', [AdminJobController::class, 'approve'])->name('jobs.approve');
+        Route::post('/jobs/{job}/reject', [AdminJobController::class, 'reject'])->name('jobs.reject');
 
-        // User & Company Management (future)
+        // Company Verification
+        Route::get('/companies/pending', [AdminCompanyController::class, 'pending'])->name('companies.pending');
+        Route::post('/companies/{company}/verify', [AdminCompanyController::class, 'verify'])->name('companies.verify');
+        Route::post('/companies/{company}/reject', [AdminCompanyController::class, 'reject'])->name('companies.reject');
+
+        // User Management
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::post('/users/{user}/suspend', [AdminUserController::class, 'suspend'])->name('users.suspend');
+        Route::post('/users/{user}/activate', [AdminUserController::class, 'activate'])->name('users.activate');
+    });
+
+    // ────────────────────────────────────────────────
+    // 8. Notifications Routes
+    // ────────────────────────────────────────────────
+    
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])->name('read-all');
     });
 });
 
 // ────────────────────────────────────────────────
-// Optional: Fallback / Catch-all
+// 9. API-like Routes for AJAX (optional)
 // ────────────────────────────────────────────────
-// If user logs in but has no role → redirect to profile or assign default
-// This can be handled in middleware or Login event listener later
+
+Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
+    Route::post('/jobs/{jobId}/save', [SavedJobController::class, 'save'])->name('jobs.save');
+    Route::delete('/jobs/{jobId}/unsave', [SavedJobController::class, 'unsave'])->name('jobs.unsave');
+    Route::get('/dashboard/refresh', [JobSeekerDashboardController::class, 'refreshData'])->name('dashboard.refresh');
+});

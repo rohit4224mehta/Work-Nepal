@@ -32,9 +32,18 @@ class UserController extends AdminController
             $query->where('account_status', $request->status);
         }
         
-        $users = $query->latest()->paginate(15);
-        
-        return view('admin.users.index', compact('users'));
+        $users = $query->paginate(15)->withQueryString();
+    
+    // Add statistics
+    $stats = [
+        'total_users' => User::count(),
+        'active_users' => User::where('account_status', 'active')->count(),
+        'job_seekers' => User::role('job_seeker')->count(),
+        'employers' => User::role('employer')->count(),
+        'admins' => User::role('admin')->count(),
+    ];
+    
+    return view('admin.users.index', compact('users', 'stats'));
     }
     
     /**

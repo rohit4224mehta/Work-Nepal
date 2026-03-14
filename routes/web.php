@@ -246,10 +246,22 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
         Route::get('/', [UserController::class, 'index'])->name('index');
         Route::get('/job-seekers', [UserController::class, 'jobSeekers'])->name('job-seekers');
         Route::get('/employers', [UserController::class, 'employers'])->name('employers');
+        Route::get('/export', [UserController::class, 'export'])->name('export');
+        Route::post('/bulk-action', [UserController::class, 'bulkAction'])->name('bulk-action');
+        
         Route::get('/{user}', [UserController::class, 'show'])->name('show');
         Route::post('/{user}/suspend', [UserController::class, 'suspend'])->name('suspend');
         Route::post('/{user}/activate', [UserController::class, 'activate'])->name('activate');
         Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
+        
+        // Super admin only routes
+        Route::middleware(['role:super_admin'])->group(function () {
+            Route::post('/{user}/impersonate', [UserController::class, 'impersonate'])->name('impersonate');
+            Route::post('/stop-impersonate', [UserController::class, 'stopImpersonate'])->name('stop-impersonate');
+        });
+        
+        Route::post('/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->name('send-password-reset');
+        Route::get('/{user}/activity', [UserController::class, 'activityLog'])->name('activity');
     });
     
     // Company Management

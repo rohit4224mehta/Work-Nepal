@@ -205,13 +205,7 @@
                                         View Profile
                                     </a>
 
-                                    <a href="{{ route('profile.edit') }}" 
-                                       class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
-                                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Edit Profile
-                                    </a>
+                                    
 
                                     <a href="{{ route('settings.index') }}"
                                        class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
@@ -530,9 +524,7 @@
                     <a href="{{ route('profile.show', auth()->user()) }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                         My Profile
                     </a>
-                    <a href="{{ route('profile.edit') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
-                        Edit Profile
-                    </a>
+                    
                     <a href="{{ route('settings.index') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                         Settings
                     </a>

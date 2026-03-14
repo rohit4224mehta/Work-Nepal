@@ -15,6 +15,18 @@ use App\Http\Controllers\Employer\JobController as EmployerJobController;
 use App\Http\Controllers\Employer\ApplicantController as EmployerApplicantController;
 use App\Http\Controllers\Employer\DashboardController as EmployerDashboardController;
 use App\Http\Controllers\NotificationController;
+
+
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\UserController;
+// use App\Http\Controllers\Admin\CompanyController;
+// use App\Http\Controllers\Admin\JobController;
+// use App\Http\Controllers\Admin\ApplicationController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\TestimonialController;
+// use App\Http\Controllers\Admin\PageController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\LogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -223,34 +235,71 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
     // ────────────────────────────────────────────────
     
     Route::middleware(['role:admin|super_admin'])->prefix('admin')->name('admin.')->group(function () {
-        // Dashboard
-        Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
-
-        // Job Moderation
-        Route::get('/jobs/pending', [AdminJobController::class, 'pending'])->name('jobs.pending');
-        Route::post('/jobs/{job}/approve', [AdminJobController::class, 'approve'])->name('jobs.approve');
-        Route::post('/jobs/{job}/reject', [AdminJobController::class, 'reject'])->name('jobs.reject');
-
-        // Company Verification
-        Route::get('/companies/pending', [AdminCompanyController::class, 'pending'])->name('companies.pending');
-        Route::post('/companies/{company}/verify', [AdminCompanyController::class, 'verify'])->name('companies.verify');
-        Route::post('/companies/{company}/reject', [AdminCompanyController::class, 'reject'])->name('companies.reject');
-
-        // User Management
-        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-        Route::post('/users/{user}/suspend', [AdminUserController::class, 'suspend'])->name('users.suspend');
-        Route::post('/users/{user}/activate', [AdminUserController::class, 'activate'])->name('users.activate');
-    });
-
-    // ────────────────────────────────────────────────
-    // 8. Notifications Routes
-    // ────────────────────────────────────────────────
+          
+    // Dashboard
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/export', [DashboardController::class, 'export'])->name('dashboard.export');
+    Route::get('/dashboard/refresh', [DashboardController::class, 'refresh'])->name('dashboard.refresh');
     
-    Route::prefix('notifications')->name('notifications.')->group(function () {
-        Route::get('/', [NotificationController::class, 'index'])->name('index');
-        Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
-        Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])->name('read-all');
+    // User Management
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('index');
+        Route::get('/job-seekers', [UserController::class, 'jobSeekers'])->name('job-seekers');
+        Route::get('/employers', [UserController::class, 'employers'])->name('employers');
+        Route::get('/{user}', [UserController::class, 'show'])->name('show');
+        Route::post('/{user}/suspend', [UserController::class, 'suspend'])->name('suspend');
+        Route::post('/{user}/activate', [UserController::class, 'activate'])->name('activate');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
     });
+    
+    // Company Management
+    Route::prefix('companies')->name('companies.')->group(function () {
+        Route::get('/', [CompanyController::class, 'index'])->name('index');
+        Route::get('/pending', [CompanyController::class, 'pending'])->name('pending');
+        Route::get('/verified', [CompanyController::class, 'verified'])->name('verified');
+        Route::get('/{company}', [CompanyController::class, 'show'])->name('show');
+        Route::post('/{company}/verify', [CompanyController::class, 'verify'])->name('verify');
+        Route::post('/{company}/reject', [CompanyController::class, 'reject'])->name('reject');
+        Route::delete('/{company}', [CompanyController::class, 'destroy'])->name('destroy');
+    });
+    
+    // Job Management
+    Route::prefix('jobs')->name('jobs.')->group(function () {
+        Route::get('/', [JobController::class, 'index'])->name('index');
+        Route::get('/pending', [JobController::class, 'pending'])->name('pending');
+        Route::get('/featured', [JobController::class, 'featured'])->name('featured');
+        Route::get('/{job}', [JobController::class, 'show'])->name('show');
+        Route::post('/{job}/approve', [JobController::class, 'approve'])->name('approve');
+        Route::post('/{job}/reject', [JobController::class, 'reject'])->name('reject');
+        Route::post('/{job}/feature', [JobController::class, 'feature'])->name('feature');
+        Route::delete('/{job}', [JobController::class, 'destroy'])->name('destroy');
+    });
+    
+    // Applications
+    Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
+    
+    // Reports
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    
+    // Testimonials
+    Route::resource('testimonials', TestimonialController::class);
+    
+    // Pages
+    Route::resource('pages', PageController::class);
+    
+    // Settings
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+    
+    // Logs
+    Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
+    Route::get('/logs/{log}', [LogController::class, 'show'])->name('logs.show');
+    
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+});
 });
 
 // ────────────────────────────────────────────────

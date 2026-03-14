@@ -1,36 +1,60 @@
 <?php
+// app/Models/JobApplication.php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class JobApplication extends Model
 {
     use HasFactory;
 
+    protected $table = 'job_applications';
+    
     protected $fillable = [
         'user_id',
         'job_posting_id',
-        'status', // applied, viewed, shortlisted, rejected, hired, etc.
+        'status',
         'applied_at',
-        // add more: cover_letter, resume_version, etc.
+        'employer_feedback',
+        'status_updated_at',
     ];
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
+    protected $casts = [
+        'applied_at' => 'datetime',
+        'status_updated_at' => 'datetime',
+    ];
 
-    public function job(): BelongsTo
+    /**
+     * Get the job posting that this application belongs to.
+     */
+    public function jobPosting()
     {
         return $this->belongsTo(JobPosting::class, 'job_posting_id');
     }
 
-    // Optional: company through job
+    /**
+     * Alternative relationship name (if you're using this instead)
+     */
+    public function job()
+    {
+        return $this->belongsTo(JobPosting::class, 'job_posting_id');
+    }
+
+    /**
+     * Get the applicant (user) who submitted this application.
+     */
+    public function applicant()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Get the company through the job posting.
+     */
     public function company()
     {
-        return $this->job->company;
+        return $this->jobPosting->company();
     }
 }

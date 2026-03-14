@@ -13,35 +13,31 @@ class ApplicantController extends Controller
     /**
      * Display a listing of all applicants across companies.
      */
-    public function index(): View
-    {
-        $user = auth()->user();
-        $companies = $user->accessibleCompanies()->pluck('id');
-        
-        $applications = JobApplication::whereHas('jobPosting', function ($query) use ($companies) {
-                $query->whereIn('company_id', $companies);
-            })
-            ->with(['applicant', 'jobPosting.company'])
-            ->latest()
-            ->paginate(20);
-        
-        return view('employer.applicants.index', compact('applications'));
-    }
+    public function index()
+{
+    $user = auth()->user();
+    $companies = $user->accessibleCompanies()->pluck('id');
+    
+    $applications = JobApplication::whereHas('jobPosting', function ($query) use ($companies) {
+            $query->whereIn('company_id', $companies);
+        })
+        ->with(['applicant', 'jobPosting.company'])
+        ->latest()
+        ->paginate(15);
+    
+    return view('employer.applicants.index', compact('applications'));
+}
 
-    /**
-     * Display the specified application.
-     */
-    public function show(JobApplication $application)
-    {
-        // Check permission
-        if (!auth()->user()->canManageCompany($application->jobPosting->company)) {
-            abort(403);
-        }
-
-        $application->load(['applicant', 'jobPosting.company']);
-        
-        return view('employer.applicants.show', compact('application'));
+public function show(JobApplication $application)
+{
+    if (!auth()->user()->canManageCompany($application->jobPosting->company)) {
+        abort(403);
     }
+    
+    $application->load(['applicant', 'jobPosting.company']);
+    
+    return view('employer.applicants.show', compact('application'));
+}
 
     /**
      * Update application status.

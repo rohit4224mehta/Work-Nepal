@@ -213,6 +213,8 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
             Route::get('/company/{company}/team', [EmployerCompanyController::class, 'team'])->name('company.team');
             Route::post('/company/{company}/team/add', [EmployerCompanyController::class, 'addTeamMember'])->name('company.team.add');
             Route::delete('/company/{company}/team/{user}', [EmployerCompanyController::class, 'removeTeamMember'])->name('company.team.remove');
+
+            
         });
     });
 

@@ -19,7 +19,7 @@ use App\Http\Controllers\NotificationController;
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController;
-// use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\CompanyController as AdminController;
 // use App\Http\Controllers\Admin\JobController;
 // use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ReportController;
@@ -264,32 +264,58 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
         Route::get('/{user}/activity', [UserController::class, 'activityLog'])->name('activity');
     });
     
-    // Company Management
-    Route::prefix('companies')->name('companies.')->group(function () {
-        Route::get('/', [CompanyController::class, 'index'])->name('index');
-        Route::get('/pending', [CompanyController::class, 'pending'])->name('pending');
-        Route::get('/verified', [CompanyController::class, 'verified'])->name('verified');
-        Route::get('/{company}', [CompanyController::class, 'show'])->name('show');
-        Route::post('/{company}/verify', [CompanyController::class, 'verify'])->name('verify');
-        Route::post('/{company}/reject', [CompanyController::class, 'reject'])->name('reject');
-        Route::delete('/{company}', [CompanyController::class, 'destroy'])->name('destroy');
-    });
+    // Admin Company Management Routes
+Route::prefix('companies')->name('companies.')->group(function () {
+    Route::get('/', [CompanyController::class, 'index'])->name('index');
+    Route::get('/pending', [CompanyController::class, 'pending'])->name('pending');
+    Route::get('/verified', [CompanyController::class, 'verified'])->name('verified');
+    Route::get('/export', [CompanyController::class, 'export'])->name('export');
+    Route::post('/bulk-action', [CompanyController::class, 'bulkAction'])->name('bulk-action');
+    
+    Route::get('/{company}', [CompanyController::class, 'show'])->name('show');
+    Route::get('/{company}/insights', [CompanyController::class, 'insights'])->name('insights');
+    Route::post('/{company}/verify', [CompanyController::class, 'verify'])->name('verify');
+    Route::post('/{company}/reject', [CompanyController::class, 'reject'])->name('reject');
+    Route::post('/{company}/suspend', [CompanyController::class, 'suspend'])->name('suspend');
+    Route::post('/{company}/activate', [CompanyController::class, 'activate'])->name('activate');
+    Route::delete('/{company}', [CompanyController::class, 'destroy'])->name('destroy');
+});
     
     // Job Management
-    Route::prefix('jobs')->name('jobs.')->group(function () {
-        Route::get('/', [JobController::class, 'index'])->name('index');
-        Route::get('/pending', [JobController::class, 'pending'])->name('pending');
-        Route::get('/featured', [JobController::class, 'featured'])->name('featured');
-        Route::get('/{job}', [JobController::class, 'show'])->name('show');
-        Route::post('/{job}/approve', [JobController::class, 'approve'])->name('approve');
-        Route::post('/{job}/reject', [JobController::class, 'reject'])->name('reject');
-        Route::post('/{job}/feature', [JobController::class, 'feature'])->name('feature');
-        Route::delete('/{job}', [JobController::class, 'destroy'])->name('destroy');
-    });
+    // Admin Job Management Routes
+Route::prefix('jobs')->name('jobs.')->group(function () {
+    Route::get('/', [JobController::class, 'index'])->name('index');
+    Route::get('/pending', [JobController::class, 'pending'])->name('pending');
+    Route::get('/featured', [JobController::class, 'featured'])->name('featured');
+    Route::get('/export', [JobController::class, 'export'])->name('export');
+    Route::post('/bulk-action', [JobController::class, 'bulkAction'])->name('bulk-action');
     
-    // Applications
-    Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
+    Route::get('/{job}', [JobController::class, 'show'])->name('show');
+    Route::get('/{job}/insights', [JobController::class, 'insights'])->name('insights');
+    Route::post('/{job}/approve', [JobController::class, 'approve'])->name('approve');
+    Route::post('/{job}/reject', [JobController::class, 'reject'])->name('reject');
+    Route::post('/{job}/feature', [JobController::class, 'feature'])->name('feature');
+    Route::post('/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('toggle-status');
+    Route::delete('/{job}', [JobController::class, 'destroy'])->name('destroy');
+});
+
+
+    // Admin Applications Routes
+Route::prefix('applications')->name('applications.')->group(function () {
+    Route::get('/', [ApplicationController::class, 'index'])->name('index');
+    Route::get('/stats', [ApplicationController::class, 'getStats'])->name('stats');
+    Route::get('/export', [ApplicationController::class, 'export'])->name('export');
+    Route::post('/bulk-update', [ApplicationController::class, 'bulkUpdate'])->name('bulk-update');
+    Route::delete('/bulk-delete', [ApplicationController::class, 'bulkDelete'])->name('bulk-delete');
     
+    Route::get('/job/{job}', [ApplicationController::class, 'jobApplications'])->name('job');
+    Route::get('/user/{user}', [ApplicationController::class, 'userApplications'])->name('user');
+    
+    Route::get('/{application}', [ApplicationController::class, 'show'])->name('show');
+    Route::post('/{application}/status', [ApplicationController::class, 'updateStatus'])->name('status');
+    Route::post('/{application}/feedback', [ApplicationController::class, 'addFeedback'])->name('feedback');
+    Route::delete('/{application}', [ApplicationController::class, 'destroy'])->name('destroy');
+});
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     

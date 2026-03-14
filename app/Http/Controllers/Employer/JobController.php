@@ -8,6 +8,7 @@ use App\Models\JobPosting;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Str;
 
 class JobController extends Controller
 {
@@ -17,9 +18,11 @@ class JobController extends Controller
     public function index(): View
     {
         $user = auth()->user();
-        $companies = $user->accessibleCompanies()->pluck('id');
         
-        $jobs = JobPosting::whereIn('company_id', $companies)
+        // Get all companies the user has access to
+        $companyIds = $user->accessibleCompanyIds();
+        
+        $jobs = JobPosting::whereIn('company_id', $companyIds)
             ->with(['company', 'applications'])
             ->withCount('applications')
             ->latest()
@@ -35,12 +38,12 @@ class JobController extends Controller
     {
         $user = auth()->user();
         $companies = $user->accessibleCompanies()->get();
-        
+
         if ($companies->isEmpty()) {
             return redirect()->route('employer.company.create')
                 ->with('error', 'You need to create a company first.');
         }
-        
+
         return view('employer.jobs.create', compact('companies'));
     }
 
@@ -62,15 +65,15 @@ class JobController extends Controller
         ]);
 
         $company = Company::findOrFail($request->company_id);
-        
-        // Check permission
-        if (!auth()->user()->canManageCompany($company)) {
+
+        // Check permission - FIXED: using canAccessCompany() instead of canManageCompany()
+        if (!auth()->user()->canAccessCompany($company)) {
             abort(403, 'You cannot post jobs for this company');
         }
 
         $job = JobPosting::create([
             'title' => $request->title,
-            'slug' => \Str::slug($request->title . '-' . uniqid()),
+            'slug' => Str::slug($request->title . '-' . uniqid()),
             'description' => $request->description,
             'company_id' => $company->id,
             'posted_by' => auth()->id(),
@@ -93,8 +96,8 @@ class JobController extends Controller
      */
     public function edit(JobPosting $job)
     {
-        // Check permission
-        if (!auth()->user()->canManageCompany($job->company)) {
+        // Check permission - FIXED: using canAccessCompany()
+        if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403);
         }
         
@@ -108,8 +111,8 @@ class JobController extends Controller
      */
     public function update(Request $request, JobPosting $job)
     {
-        // Check permission
-        if (!auth()->user()->canManageCompany($job->company)) {
+        // Check permission - FIXED: using canAccessCompany()
+        if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403);
         }
 
@@ -135,8 +138,8 @@ class JobController extends Controller
      */
     public function destroy(JobPosting $job)
     {
-        // Check permission
-        if (!auth()->user()->canManageCompany($job->company)) {
+        // Check permission - FIXED: using canAccessCompany()
+        if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403);
         }
 
@@ -151,8 +154,8 @@ class JobController extends Controller
      */
     public function applications(JobPosting $job)
     {
-        // Check permission
-        if (!auth()->user()->canManageCompany($job->company)) {
+        // Check permission - FIXED: using canAccessCompany()
+        if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403);
         }
 

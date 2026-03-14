@@ -15,7 +15,7 @@
             <!-- Desktop Navigation -->
             <div class="hidden md:flex items-center space-x-8 lg:space-x-12">
 
-                <!-- Common Navigation Links -->
+                <!-- Common Navigation Links (Visible to Everyone) -->
                 <div class="flex items-center space-x-6 lg:space-x-8">
                     <a href="{{ route('jobs.index') }}"
                        class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-all duration-200 relative group py-2">
@@ -47,11 +47,11 @@
                     </a>
                 </div>
 
-                <!-- Authenticated / Role-Specific Area -->
+                <!-- Right Side Actions -->
                 <div class="flex items-center space-x-4 lg:space-x-6">
 
                     @guest
-                        <!-- Guest State with enhanced CTAs -->
+                        <!-- Guest State -->
                         <a href="{{ route('login') }}"
                            class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
                             Log in
@@ -62,7 +62,7 @@
                             Join Free
                         </a>
                     @else
-                        <!-- Job Seeker Quick Links -->
+                        <!-- Job Seeker Quick Links (Only visible to job seekers) -->
                         @role('job_seeker')
                             <a href="{{ route('saved.jobs') }}" 
                                class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 relative group">
@@ -94,64 +94,7 @@
                             </a>
                         @endrole
 
-                        <!-- Employer Quick Actions - FIXED VERSION -->
-                        @role('employer|recruiter')
-                            @php
-                                try {
-                                    $user = auth()->user();
-                                    $companies = $user->accessibleCompanies()->pluck('id');
-                                    
-                                    // Check which relationship exists and use the correct one
-                                    if (method_exists(\App\Models\JobApplication::class, 'jobPosting')) {
-                                        $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companies) {
-                                            $q->whereIn('company_id', $companies);
-                                        })->where('status', 'applied')->count();
-                                    } elseif (method_exists(\App\Models\JobApplication::class, 'job')) {
-                                        $newApplicants = \App\Models\JobApplication::whereHas('job', function($q) use ($companies) {
-                                            $q->whereIn('company_id', $companies);
-                                        })->where('status', 'applied')->count();
-                                    } else {
-                                        // Fallback: direct join if relationships don't exist
-                                        $newApplicants = \App\Models\JobApplication::join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
-                                            ->whereIn('job_postings.company_id', $companies)
-                                            ->where('job_applications.status', 'applied')
-                                            ->count();
-                                    }
-                                } catch (\Exception $e) {
-                                    $newApplicants = 0;
-                                }
-                            @endphp
-                            
-                            <a href="{{ route('employer.jobs.create') }}"
-                               class="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">
-                                Post a Job
-                            </a>
-
-                            <a href="{{ route('employer.jobs.index') }}"
-                               class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                                My Jobs
-                            </a>
-
-                            <a href="{{ route('employer.applicants.index') }}"
-                               class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 relative">
-                                Applicants
-                                @if($newApplicants > 0)
-                                    <span class="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                        {{ $newApplicants > 9 ? '9+' : $newApplicants }}
-                                    </span>
-                                @endif
-                            </a>
-                        @endrole
-
-                        <!-- Admin Quick Actions -->
-                        @role('admin|super_admin')
-                            <a href="{{ route('admin.dashboard') }}"
-                               class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200">
-                                Admin
-                            </a>
-                        @endrole
-
-                        <!-- Notifications Bell with Alpine.js -->
+                        <!-- Notifications Bell (Visible to all authenticated users) -->
                         <div class="relative" x-data="{ notificationsOpen: false }">
                             <button @click="notificationsOpen = !notificationsOpen" 
                                     class="relative text-gray-700 dark:text-gray-300 hover:text-red-600 transition-colors focus:outline-none p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -217,7 +160,7 @@
                             </div>
                         </div>
 
-                        <!-- Profile Dropdown with Alpine.js -->
+                        <!-- Profile Dropdown with Alpine.js (ALL role-specific actions go here) -->
                         <div class="relative" x-data="{ profileDropdownOpen: false }">
                             <button @click="profileDropdownOpen = !profileDropdownOpen" 
                                     class="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -253,13 +196,13 @@
                                         </div>
                                     </div>
 
-                                    <!-- Menu Items -->
+                                    <!-- Common Menu Items (Visible to all authenticated users) -->
                                     <a href="{{ route('profile.show', auth()->user()) }}" 
                                        class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                         </svg>
-                                        My Profile
+                                        View Profile
                                     </a>
 
                                     <a href="{{ route('profile.edit') }}" 
@@ -270,26 +213,6 @@
                                         Edit Profile
                                     </a>
 
-                                    @role('job_seeker')
-                                        <a href="{{ route('dashboard.jobseeker') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
-                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                            </svg>
-                                            Dashboard
-                                        </a>
-                                    @endrole
-
-                                    @role('employer|recruiter')
-                                        <a href="{{ route('employer.dashboard') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
-                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                            </svg>
-                                            Company Dashboard
-                                        </a>
-                                    @endrole
-
                                     <a href="{{ route('settings.index') }}"
                                        class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,19 +222,158 @@
                                         Settings
                                     </a>
 
-                                    <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                    <!-- JOB SEEKER SPECIFIC ACTIONS -->
+                                    @role('job_seeker')
+                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        
+                                        <a href="{{ route('dashboard.jobseeker') }}" 
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                            </svg>
+                                            Job Seeker Dashboard
+                                        </a>
+                                        
+                                        <a href="{{ route('saved.jobs') }}" 
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                            </svg>
+                                            Saved Jobs
+                                            @if(auth()->user()->savedJobs()->count() > 0)
+                                                <span class="ml-auto bg-red-100 text-red-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                                                    {{ auth()->user()->savedJobs()->count() }}
+                                                </span>
+                                            @endif
+                                        </a>
+                                        
+                                        <a href="{{ route('applications.index') }}" 
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            My Applications
+                                            @php
+                                                $pendingCount = auth()->user()->jobApplications()->whereIn('status', ['applied', 'viewed'])->count();
+                                            @endphp
+                                            @if($pendingCount > 0)
+                                                <span class="ml-auto bg-yellow-100 text-yellow-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                                                    {{ $pendingCount }} pending
+                                                </span>
+                                            @endif
+                                        </a>
+                                    @endrole
 
+                                    <!-- EMPLOYER SPECIFIC ACTIONS -->
+                                    @role('employer|recruiter')
+                                        @php
+                                            // Safe way to get company IDs without using undefined method
+                                            $user = auth()->user();
+                                            $companyIds = collect([]);
+                                            
+                                            try {
+                                                // Get owned companies
+                                                $ownedIds = $user->ownedCompanies()->pluck('id');
+                                                
+                                                // Get team member companies
+                                                $teamIds = $user->teamMemberCompanies()->pluck('id');
+                                                
+                                                // Merge both collections
+                                                $companyIds = $ownedIds->merge($teamIds);
+                                            } catch (\Exception $e) {
+                                                $companyIds = collect([]);
+                                            }
+                                        @endphp
+                                        
+                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        
+                                        <a href="{{ route('employer.dashboard') }}" 
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            Company Dashboard
+                                        </a>
+                                        
+                                        <!-- EMPLOYER ACTION BUTTONS -->
+                                        <a href="{{ route('employer.jobs.create') }}"
+                                           class="block px-5 py-3 text-sm text-white bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 mx-3 my-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                            Post a New Job
+                                        </a>
+                                        
+                                        <a href="{{ route('employer.jobs.index') }}"
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            Manage Jobs
+                                            @php
+                                                $activeJobsCount = 0;
+                                                if ($companyIds->isNotEmpty()) {
+                                                    $activeJobsCount = \App\Models\JobPosting::whereIn('company_id', $companyIds)
+                                                        ->where('status', 'active')
+                                                        ->count();
+                                                }
+                                            @endphp
+                                            @if($activeJobsCount > 0)
+                                                <span class="ml-auto bg-blue-100 text-blue-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                                                    {{ $activeJobsCount }} active
+                                                </span>
+                                            @endif
+                                        </a>
+                                        
+                                        <a href="{{ route('employer.applicants.index') }}"
+                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                            Applicants
+                                            @php
+                                                $newApplicants = 0;
+                                                if ($companyIds->isNotEmpty()) {
+                                                    try {
+                                                        if (method_exists(\App\Models\JobApplication::class, 'jobPosting')) {
+                                                            $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companyIds) {
+                                                                $q->whereIn('company_id', $companyIds);
+                                                            })->where('status', 'applied')->count();
+                                                        } else {
+                                                            $newApplicants = \App\Models\JobApplication::join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
+                                                                ->whereIn('job_postings.company_id', $companyIds)
+                                                                ->where('job_applications.status', 'applied')
+                                                                ->count();
+                                                        }
+                                                    } catch (\Exception $e) {
+                                                        $newApplicants = 0;
+                                                    }
+                                                }
+                                            @endphp
+                                            @if($newApplicants > 0)
+                                                <span class="ml-auto bg-red-100 text-red-600 text-xs font-medium px-2 py-0.5 rounded-full animate-pulse">
+                                                    {{ $newApplicants }} new
+                                                </span>
+                                            @endif
+                                        </a>
+                                    @endrole
+
+                                    <!-- ADMIN SPECIFIC ACTIONS -->
                                     @role('admin|super_admin')
+                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        
                                         <a href="{{ route('admin.dashboard') }}" 
                                            class="block px-5 py-3 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors flex items-center gap-3">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            Admin Panel
+                                            Admin Dashboard
                                         </a>
-                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
                                     @endrole
 
+                                    <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+
+                                    <!-- Logout -->
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="w-full text-left px-5 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-3">
@@ -388,9 +450,9 @@
             </a>
 
             @auth
-                <!-- Role-specific links for mobile -->
+                <!-- Role-specific links for mobile (simplified) -->
                 @role('job_seeker')
-                    <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                         <a href="{{ route('dashboard.jobseeker') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             Dashboard
                         </a>
@@ -417,7 +479,12 @@
                 @endrole
 
                 @role('employer|recruiter')
-                    <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
+                    @php
+                        $user = auth()->user();
+                        $companyIds = $user->ownedCompanies()->pluck('id')
+                            ->merge($user->teamMemberCompanies()->pluck('id'));
+                    @endphp
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                         <a href="{{ route('employer.dashboard') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             Company Dashboard
                         </a>
@@ -430,26 +497,15 @@
                         <a href="{{ route('employer.applicants.index') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             Applicants
                             @php
-                                try {
-                                    $user = auth()->user();
-                                    $companies = $user->accessibleCompanies()->pluck('id');
-                                    
-                                    if (method_exists(\App\Models\JobApplication::class, 'jobPosting')) {
-                                        $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companies) {
-                                            $q->whereIn('company_id', $companies);
+                                $newApplicants = 0;
+                                if ($companyIds->isNotEmpty()) {
+                                    try {
+                                        $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companyIds) {
+                                            $q->whereIn('company_id', $companyIds);
                                         })->where('status', 'applied')->count();
-                                    } elseif (method_exists(\App\Models\JobApplication::class, 'job')) {
-                                        $newApplicants = \App\Models\JobApplication::whereHas('job', function($q) use ($companies) {
-                                            $q->whereIn('company_id', $companies);
-                                        })->where('status', 'applied')->count();
-                                    } else {
-                                        $newApplicants = \App\Models\JobApplication::join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
-                                            ->whereIn('job_postings.company_id', $companies)
-                                            ->where('job_applications.status', 'applied')
-                                            ->count();
+                                    } catch (\Exception $e) {
+                                        $newApplicants = 0;
                                     }
-                                } catch (\Exception $e) {
-                                    $newApplicants = 0;
                                 }
                             @endphp
                             @if($newApplicants > 0)
@@ -470,7 +526,7 @@
                 @endrole
 
                 <!-- Common authenticated links for mobile -->
-                <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                     <a href="{{ route('profile.show', auth()->user()) }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                         My Profile
                     </a>
@@ -500,17 +556,7 @@
                 </div>
             @endauth
 
-            <!-- Footer Links -->
-            <div class="pt-6 mt-4 border-t border-gray-200 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400">
-                <div class="flex flex-wrap gap-4">
-                    <a href="{{ route('pages.about') }}" class="hover:text-red-600">About</a>
-                    <a href="{{ route('pages.contact') }}" class="hover:text-red-600">Contact</a>
-                    <a href="{{ route('pages.privacy') }}" class="hover:text-red-600">Privacy</a>
-                    <a href="{{ route('pages.terms') }}" class="hover:text-red-600">Terms</a>
-                    <a href="{{ route('pages.help-center') }}" class="hover:text-red-600">Help</a>
-                </div>
-                <p class="mt-4">© {{ date('Y') }} WorkNepal. All rights reserved.</p>
-            </div>
+           
         </div>
     </div>
 </header>

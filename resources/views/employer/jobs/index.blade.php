@@ -1,4 +1,3 @@
-{{-- resources/views/employer/jobs/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Manage Jobs - WorkNepal')
@@ -49,13 +48,13 @@
                             <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ $job->location }}</td>
                             <td class="px-6 py-4">
                                 <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-xs">
-                                    {{ ucfirst($job->job_type) }}
+                                    {{ ucfirst(str_replace('-', ' ', $job->job_type)) }}
                                 </span>
                             </td>
                             <td class="px-6 py-4">
                                 <a href="{{ route('employer.jobs.applications', $job) }}" 
                                    class="text-red-600 hover:text-red-700 font-medium">
-                                    {{ $job->applications_count }} applications
+                                    {{ $job->applications_count ?? 0 }} applications
                                 </a>
                             </td>
                             <td class="px-6 py-4">
@@ -119,9 +118,11 @@
         </div>
         
         {{-- Pagination --}}
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            {{ $jobs->links() }}
-        </div>
+        @if(isset($jobs) && method_exists($jobs, 'links'))
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                {{ $jobs->links() }}
+            </div>
+        @endif
     </div>
 </div>
 @endsection

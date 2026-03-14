@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,7 +11,6 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Support\Enums\AccountStatus;
-
 use App\Support\Enums\Gender;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -55,13 +53,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'account_status' => AccountStatus::ACTIVE,
     ];
 
-/*
-|--------------------------------------------------------------------------
-| Accessors & Mutators
-|--------------------------------------------------------------------------
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors & Mutators
+    |--------------------------------------------------------------------------
+    */
 
-protected function profilePhotoUrl(): Attribute
+    protected function profilePhotoUrl(): Attribute
     {
         return Attribute::make(
             get: fn (?string $value): string =>
@@ -272,7 +270,86 @@ protected function profilePhotoUrl(): Attribute
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | Company Relationship Methods (ADDED/ENHANCED)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Companies the user belongs to (as member/team member)
+     * Note: This uses the company_user pivot table
+     */
+    /*
+|--------------------------------------------------------------------------
+| Company Relationship Methods
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Companies the user belongs to (as member/team member)
+ * Note: This uses the company_user pivot table
+ */
+public function companies()
+{
+    return $this->belongsToMany(Company::class, 'company_user')
+        ->withPivot('role', 'is_active')
+        ->withTimestamps();
+}
+
+/**
+ * Companies where user is a team member (using the company_team_members table)
+ * FIXED: Added select('companies.*') to avoid ambiguous column issues
+ */
+public function teamMemberCompanies()
+{
+    return $this->belongsToMany(Company::class, 'company_team_members')
+                ->withPivot('role', 'is_active', 'permissions')
+                ->withTimestamps()
+                ->select('companies.*'); // THIS FIXES THE ERROR
+}
+
+/**
+ * Companies owned by the user
+ */
+public function ownedCompanies()
+{
+    return $this->hasMany(Company::class, 'owner_id');
+}
+
+/**
+ * Get all companies that the user has access to (owned + team member)
+ */
+public function accessibleCompanies()
+{
+    $ownedIds = $this->ownedCompanies()->pluck('id');
+    $teamIds = $this->teamMemberCompanies()->pluck('companies.id'); // Specify table
+    
+    return Company::whereIn('id', $ownedIds)
+        ->orWhereIn('id', $teamIds);
+}
+
+/**
+ * Get all company IDs that the user has access to
+ */
+public function accessibleCompanyIds()
+{
+    return $this->ownedCompanies()->pluck('id')
+        ->merge($this->teamMemberCompanies()->pluck('companies.id')); // Specify table
+}
+
+/**
+ * Check if user can access a specific company
+ */
+public function canAccessCompany(Company $company): bool
+{
+    return $this->id === $company->owner_id
+        || $this->teamMemberCompanies()
+            ->where('company_id', $company->id)
+            ->wherePivot('is_active', true)
+            ->exists();
+}
+    /*
+    |--------------------------------------------------------------------------
+    | Other Relationships
     |--------------------------------------------------------------------------
     */
 
@@ -282,34 +359,6 @@ protected function profilePhotoUrl(): Attribute
     public function socialAccounts()
     {
         return $this->hasMany(SocialAccount::class);
-    }
-
-    /**
-     * Companies the user belongs to (as member)
-     */
-    public function companies()
-    {
-        return $this->belongsToMany(Company::class, 'company_user')
-            ->withPivot('role', 'is_active')
-            ->withTimestamps();
-    }
-
-    /**
-     * Companies owned by the user
-     */
-    public function ownedCompanies()
-    {
-        return $this->hasMany(Company::class, 'owner_id');
-    }
-
-    /**
-     * Current active company for the user
-     */
-    public function currentCompany()
-    {
-        return $this->companies()
-            ->wherePivot('is_active', true)
-            ->first();
     }
 
     /**

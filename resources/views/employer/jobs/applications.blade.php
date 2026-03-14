@@ -1,4 +1,3 @@
-{{-- resources/views/employer/jobs/applications.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Applications for ' . $job->title . ' - WorkNepal')
@@ -22,7 +21,7 @@
         </div>
         
         {{-- Job Stats --}}
-        <div class="grid grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
             <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                 <div class="text-2xl font-bold text-gray-900 dark:text-white">{{ $applications->total() }}</div>
                 <div class="text-sm text-gray-600 dark:text-gray-400">Total Applications</div>
@@ -76,7 +75,7 @@
                             </td>
                             <td class="px-6 py-4">
                                 <select onchange="updateStatus({{ $application->id }}, this.value)"
-                                        class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
+                                        class="status-select px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none dark:bg-gray-700 dark:text-white">
                                     <option value="applied" {{ $application->status == 'applied' ? 'selected' : '' }}>Applied</option>
                                     <option value="viewed" {{ $application->status == 'viewed' ? 'selected' : '' }}>Viewed</option>
                                     <option value="shortlisted" {{ $application->status == 'shortlisted' ? 'selected' : '' }}>Shortlisted</option>
@@ -88,14 +87,14 @@
                                 @if($application->applicant->resume_path)
                                     <a href="{{ Storage::url($application->applicant->resume_path) }}" 
                                        target="_blank"
-                                       class="text-red-600 hover:text-red-700 text-sm font-medium inline-flex items-center">
+                                       class="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-sm hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors">
                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         View CV
                                     </a>
                                 @else
-                                    <span class="text-gray-400">No CV</span>
+                                    <span class="text-gray-400 text-sm">No CV</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">
@@ -124,12 +123,15 @@
         </div>
         
         {{-- Pagination --}}
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            {{ $applications->links() }}
-        </div>
+        @if($applications->hasPages())
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                {{ $applications->links() }}
+            </div>
+        @endif
     </div>
 </div>
 
+@push('scripts')
 <script>
 function updateStatus(applicationId, status) {
     fetch(`/employer/applicants/${applicationId}/status`, {
@@ -144,15 +146,19 @@ function updateStatus(applicationId, status) {
     .then(data => {
         if (data.success) {
             showNotification('success', 'Status updated successfully');
+        } else {
+            showNotification('error', data.message || 'Failed to update status');
         }
     })
     .catch(error => {
-        showNotification('error', 'Failed to update status');
+        showNotification('error', 'Network error. Please try again.');
     });
 }
 
 function showNotification(type, message) {
     // Your notification logic here
+    alert(message);
 }
 </script>
+@endpush
 @endsection

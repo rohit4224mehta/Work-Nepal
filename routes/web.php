@@ -316,19 +316,68 @@ Route::prefix('applications')->name('applications.')->group(function () {
     Route::post('/{application}/feedback', [ApplicationController::class, 'addFeedback'])->name('feedback');
     Route::delete('/{application}', [ApplicationController::class, 'destroy'])->name('destroy');
 });
-    // Reports
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+
+
+// Admin Content Moderation Routes
+Route::prefix('content')->name('content.')->group(function () {
     
+    // Testimonials
+    Route::prefix('testimonials')->name('testimonials.')->group(function () {
+        Route::get('/', [ContentController::class, 'testimonials'])->name('index');
+        Route::get('/export', [ContentController::class, 'exportTestimonials'])->name('export');
+        Route::post('/bulk', [ContentController::class, 'bulkTestimonials'])->name('bulk');
+        
+        Route::post('/{testimonial}/approve', [ContentController::class, 'approveTestimonial'])->name('approve');
+        Route::post('/{testimonial}/reject', [ContentController::class, 'rejectTestimonial'])->name('reject');
+        Route::post('/{testimonial}/toggle-featured', [ContentController::class, 'toggleFeatured'])->name('toggle-featured');
+        Route::delete('/{testimonial}', [ContentController::class, 'deleteTestimonial'])->name('delete');
+    });
+    
+    // Pages (CMS)
+    Route::prefix('pages')->name('pages.')->group(function () {
+        Route::get('/', [ContentController::class, 'pages'])->name('index');
+        Route::get('/create', [ContentController::class, 'createPage'])->name('create');
+        Route::post('/store', [ContentController::class, 'storePage'])->name('store');
+        Route::get('/{page}/edit', [ContentController::class, 'editPage'])->name('edit');
+        Route::put('/{page}', [ContentController::class, 'updatePage'])->name('update');
+        Route::post('/{page}/toggle-status', [ContentController::class, 'togglePageStatus'])->name('toggle-status');
+        Route::delete('/{page}', [ContentController::class, 'deletePage'])->name('delete');
+    });
+    
+    // Stats
+    Route::get('/stats', [ContentController::class, 'getStats'])->name('stats');
+});
+    // Admin Reports Routes
+Route::prefix('reports')->name('reports.')->group(function () {
+    Route::get('/', [ReportController::class, 'index'])->name('index');
+    Route::get('/export', [ReportController::class, 'export'])->name('export');
+    Route::get('/stats', [ReportController::class, 'getStats'])->name('stats');
+    Route::post('/bulk', [ReportController::class, 'bulkAction'])->name('bulk');
+    
+    Route::get('/{report}', [ReportController::class, 'show'])->name('show');
+    Route::post('/{report}/status', [ReportController::class, 'updateStatus'])->name('status');
+    Route::post('/{report}/assign', [ReportController::class, 'assign'])->name('assign');
+    Route::post('/{report}/action', [ReportController::class, 'takeAction'])->name('action');
+    Route::delete('/{report}', [ReportController::class, 'destroy'])->name('destroy');
+});
     // Testimonials
     Route::resource('testimonials', TestimonialController::class);
     
     // Pages
     Route::resource('pages', PageController::class);
     
-    // Settings
-    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
-    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
-    
+    // Admin Settings Routes
+Route::prefix('settings')->name('settings.')->group(function () {
+    Route::get('/', [SettingController::class, 'index'])->name('index');
+    Route::post('/', [SettingController::class, 'update'])->name('update');
+    Route::post('/update-env', [SettingController::class, 'updateEnv'])->name('update-env');
+    Route::post('/test-email', [SettingController::class, 'testEmail'])->name('test-email');
+    Route::post('/clear-cache', [SettingController::class, 'clearCache'])->name('clear-cache');
+    Route::get('/reset', [SettingController::class, 'resetDefaults'])->name('reset');
+    Route::get('/export', [SettingController::class, 'export'])->name('export');
+    Route::post('/import', [SettingController::class, 'import'])->name('import');
+});
     // Logs
     Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
     Route::get('/logs/{log}', [LogController::class, 'show'])->name('logs.show');

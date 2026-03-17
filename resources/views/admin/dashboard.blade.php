@@ -187,7 +187,7 @@
                 <p class="text-sm text-gray-500 mt-1">Flagged content</p>
             </a>
 
-            <a href="{{ route('admin.testimonials.pending') }}" class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition">
+            <a href="{{ route('admin.content.testimonials.index') }}?status=pending" class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition">
                 <div class="flex items-center justify-between mb-4">
                     <div class="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
                         <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -251,6 +251,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Determine if user is super admin
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super_admin');
+    }
+
+    /**
      * Determine if user is job seeker
      */
     public function isJobSeeker(): bool
@@ -263,6 +271,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getRoleDisplayName(): string
     {
+        if ($this->isSuperAdmin()) return 'Super Administrator';
         if ($this->isAdmin()) return 'Administrator';
         if ($this->isEmployer()) return 'Employer';
         return 'Job Seeker';
@@ -270,83 +279,84 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /*
     |--------------------------------------------------------------------------
-    | Company Relationship Methods (ADDED/ENHANCED)
+    | Company Relationship Methods
     |--------------------------------------------------------------------------
     */
 
     /**
      * Companies the user belongs to (as member/team member)
-     * Note: This uses the company_user pivot table
      */
-    /*
-|--------------------------------------------------------------------------
-| Company Relationship Methods
-|--------------------------------------------------------------------------
-*/
+    public function companies()
+    {
+        return $this->belongsToMany(Company::class, 'company_user')
+            ->withPivot('role', 'is_active')
+            ->withTimestamps();
+    }
 
-/**
- * Companies the user belongs to (as member/team member)
- * Note: This uses the company_user pivot table
- */
-public function companies()
-{
-    return $this->belongsToMany(Company::class, 'company_user')
-        ->withPivot('role', 'is_active')
-        ->withTimestamps();
-}
+    /**
+     * Companies where user is a team member
+     */
+    public function teamMemberCompanies()
+    {
+        return $this->belongsToMany(Company::class, 'company_team_members')
+                    ->withPivot('role', 'is_active', 'permissions')
+                    ->withTimestamps()
+                    ->select('companies.*');
+    }
 
-/**
- * Companies where user is a team member (using the company_team_members table)
- * FIXED: Added select('companies.*') to avoid ambiguous column issues
- */
-public function teamMemberCompanies()
-{
-    return $this->belongsToMany(Company::class, 'company_team_members')
-                ->withPivot('role', 'is_active', 'permissions')
-                ->withTimestamps()
-                ->select('companies.*'); // THIS FIXES THE ERROR
-}
+    /**
+     * Companies owned by the user
+     */
+    public function ownedCompanies()
+    {
+        return $this->hasMany(Company::class, 'owner_id');
+    }
 
-/**
- * Companies owned by the user
- */
-public function ownedCompanies()
-{
-    return $this->hasMany(Company::class, 'owner_id');
-}
+    /**
+     * Get all companies that the user has access to
+     */
+    public function accessibleCompanies()
+    {
+        $ownedIds = $this->ownedCompanies()->pluck('id')->toArray();
+        $teamIds = $this->teamMemberCompanies()->pluck('companies.id')->toArray();
+        $allIds = array_merge($ownedIds, $teamIds);
+        
+        return Company::whereIn('id', array_unique($allIds));
+    }
 
-/**
- * Get all companies that the user has access to (owned + team member)
- */
-public function accessibleCompanies()
-{
-    $ownedIds = $this->ownedCompanies()->pluck('id');
-    $teamIds = $this->teamMemberCompanies()->pluck('companies.id'); // Specify table
-    
-    return Company::whereIn('id', $ownedIds)
-        ->orWhereIn('id', $teamIds);
-}
+    /**
+     * Get all company IDs that the user has access to
+     */
+    public function accessibleCompanyIds(): array
+    {
+        $ownedIds = $this->ownedCompanies()->pluck('id')->toArray();
+        $teamIds = $this->teamMemberCompanies()->pluck('companies.id')->toArray();
+        
+        return array_unique(array_merge($ownedIds, $teamIds));
+    }
 
-/**
- * Get all company IDs that the user has access to
- */
-public function accessibleCompanyIds()
-{
-    return $this->ownedCompanies()->pluck('id')
-        ->merge($this->teamMemberCompanies()->pluck('companies.id')); // Specify table
-}
+    /**
+     * Check if user can access a specific company
+     */
+    public function canAccessCompany(Company $company): bool
+    {
+        return $this->id === $company->owner_id
+            || $this->teamMemberCompanies()
+                ->where('company_id', $company->id)
+                ->wherePivot('is_active', true)
+                ->exists();
+    }
 
-/**
- * Check if user can access a specific company
- */
-public function canAccessCompany(Company $company): bool
-{
-    return $this->id === $company->owner_id
-        || $this->teamMemberCompanies()
-            ->where('company_id', $company->id)
+    /**
+     * Get current active company for the user
+     */
+    public function currentCompany()
+    {
+        return $this->companies()
             ->wherePivot('is_active', true)
-            ->exists();
-}
+            ->first();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Other Relationships
@@ -354,7 +364,7 @@ public function canAccessCompany(Company $company): bool
     */
 
     /**
-     * Social accounts (Google, Facebook, etc.)
+     * Social accounts
      */
     public function socialAccounts()
     {
@@ -370,7 +380,7 @@ public function canAccessCompany(Company $company): bool
     }
 
     /**
-     * Skills possessed by the user (many-to-many)
+     * Skills possessed by the user
      */
     public function skills()
     {
@@ -416,7 +426,15 @@ public function canAccessCompany(Company $company): bool
      */
     public function notifications()
     {
-        return $this->hasMany(Notification::class);
+        return $this->hasMany(Notification::class)->latest();
+    }
+
+    /**
+     * Unread notifications for the user
+     */
+    public function unreadNotifications()
+    {
+        return $this->hasMany(Notification::class)->whereNull('read_at');
     }
 
     /*
@@ -425,96 +443,63 @@ public function canAccessCompany(Company $company): bool
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Scope active users
-     */
     public function scopeActive($query)
     {
         return $query->where('account_status', AccountStatus::ACTIVE);
     }
 
-    /**
-     * Scope suspended users
-     */
     public function scopeSuspended($query)
     {
         return $query->where('account_status', AccountStatus::SUSPENDED);
     }
 
-    /**
-     * Scope admin users
-     */
     public function scopeAdmins($query)
     {
         return $query->role(['admin', 'super_admin']);
     }
 
-    /**
-     * Scope employer users
-     */
     public function scopeEmployers($query)
     {
         return $query->role('employer');
     }
 
-    /**
-     * Scope job seeker users
-     */
     public function scopeJobSeekers($query)
     {
         return $query->role('job_seeker');
     }
 
-    /**
-     * Scope users who have completed their profile
-     */
-    public function scopeWithCompletedProfile($query)
-    {
-        return $query->whereNotNull('headline')
-                     ->whereNotNull('summary')
-                     ->whereNotNull('profile_photo_path')
-                     ->whereHas('skills')
-                     ->whereHas('education');
-    }
-
-    /**
-     * Scope users who have uploaded resume
-     */
     public function scopeWithResume($query)
     {
         return $query->whereNotNull('resume_path');
     }
 
-    /**
-     * Scope users who verified email
-     */
     public function scopeEmailVerified($query)
     {
         return $query->whereNotNull('email_verified_at');
     }
 
-    /**
-     * Scope users who verified mobile
-     */
     public function scopeMobileVerified($query)
     {
         return $query->whereNotNull('mobile_verified_at');
     }
 
-    /**
-     * Scope users who logged in recently (last 7 days)
-     */
     public function scopeRecentlyActive($query)
     {
         return $query->where('last_login_at', '>=', now()->subDays(7));
     }
 
-    /**
-     * Scope users by date range
-     */
     public function scopeRegisteredBetween($query, $startDate, $endDate)
     {
         return $query->whereBetween('created_at', [$startDate, $endDate]);
+    }
+
+    public function scopeSearch($query, string $term)
+    {
+        return $query->where(function ($q) use ($term) {
+            $q->where('name', 'LIKE', "%{$term}%")
+              ->orWhere('email', 'LIKE', "%{$term}%")
+              ->orWhere('mobile', 'LIKE', "%{$term}%");
+        });
     }
 
     /*
@@ -523,9 +508,6 @@ public function canAccessCompany(Company $company): bool
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Mark email as verified
-     */
     public function markEmailAsVerified()
     {
         return $this->forceFill([
@@ -533,9 +515,6 @@ public function canAccessCompany(Company $company): bool
         ])->save();
     }
 
-    /**
-     * Mark mobile as verified
-     */
     public function markMobileAsVerified()
     {
         return $this->forceFill([
@@ -543,9 +522,6 @@ public function canAccessCompany(Company $company): bool
         ])->save();
     }
 
-    /**
-     * Update last login info
-     */
     public function updateLastLogin($ip = null)
     {
         $this->forceFill([
@@ -554,48 +530,33 @@ public function canAccessCompany(Company $company): bool
         ])->save();
     }
 
-    /**
-     * Check if user has saved a specific job
-     */
-    public function hasSavedJob($jobId)
+    public function hasSavedJob($jobId): bool
     {
         return $this->savedJobs()->where('job_posting_id', $jobId)->exists();
     }
 
-    /**
-     * Toggle saved job (bookmark)
-     */
-    public function toggleSavedJob($jobId)
+    public function toggleSavedJob($jobId): bool
     {
         if ($this->hasSavedJob($jobId)) {
             $this->savedJobs()->detach($jobId);
-            return false; // removed
+            return false;
         } else {
             $this->savedJobs()->attach($jobId);
-            return true; // added
+            return true;
         }
     }
 
-    /**
-     * Get applied job IDs
-     */
-    public function appliedJobIds()
+    public function appliedJobIds(): array
     {
         return $this->jobApplications()->pluck('job_posting_id')->toArray();
     }
 
-    /**
-     * Check if user has applied to a specific job
-     */
-    public function hasAppliedToJob($jobId)
+    public function hasAppliedToJob($jobId): bool
     {
         return $this->jobApplications()->where('job_posting_id', $jobId)->exists();
     }
 
-    /**
-     * Get application count by status
-     */
-    public function getApplicationCountByStatus($status = null)
+    public function getApplicationCountByStatus($status = null): int
     {
         $query = $this->jobApplications();
         
@@ -606,9 +567,6 @@ public function canAccessCompany(Company $company): bool
         return $query->count();
     }
 
-    /**
-     * Get recent applications
-     */
     public function getRecentApplications($limit = 5)
     {
         return $this->jobApplications()
@@ -618,9 +576,6 @@ public function canAccessCompany(Company $company): bool
                     ->get();
     }
 
-    /**
-     * Get recommended jobs based on skills and preferences
-     */
     public function getRecommendedJobs($limit = 6)
     {
         $skillIds = $this->skills()->pluck('skills.id')->toArray();
@@ -632,25 +587,21 @@ public function canAccessCompany(Company $company): bool
             ->whereDate('deadline', '>=', now())
             ->with('company');
         
-        // Match by skills
         if (!empty($skillIds)) {
-            $query->whereHas('requiredSkills', function ($q) use ($skillIds) {
+            $query->whereHas('skills', function ($q) use ($skillIds) {
                 $q->whereIn('skills.id', $skillIds);
             });
         }
         
-        // Match by location preference
         if ($preference && $preference->preferred_location) {
             $query->where('location', 'like', '%' . $preference->preferred_location . '%');
         }
         
-        // Match by job type preference
         if ($preference && $preference->preferred_job_type) {
             $jobTypes = explode(',', $preference->preferred_job_type);
             $query->whereIn('job_type', $jobTypes);
         }
         
-        // Exclude jobs already applied to
         $appliedIds = $this->appliedJobIds();
         if (!empty($appliedIds)) {
             $query->whereNotIn('id', $appliedIds);

@@ -5,7 +5,7 @@
 @section('header', 'User Management')
 
 @section('content')
-<div class="py-6" x-data="userManagement()">
+<div class="py-6" x-data="userManagement()" x-init="init()">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {{-- Header with Actions --}}
@@ -96,8 +96,7 @@
                     {{-- Status Filter --}}
                     <div class="w-48">
                         <select name="status" 
-                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
-                                onchange="this.form.submit()">
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white">
                             <option value="">All Status</option>
                             <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
                             <option value="suspended" {{ request('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
@@ -107,8 +106,7 @@
                     {{-- Role Filter --}}
                     <div class="w-48">
                         <select name="role" 
-                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
-                                onchange="this.form.submit()">
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white">
                             <option value="">All Roles</option>
                             <option value="job_seeker" {{ request('role') == 'job_seeker' ? 'selected' : '' }}>Job Seeker</option>
                             <option value="employer" {{ request('role') == 'employer' ? 'selected' : '' }}>Employer</option>
@@ -119,8 +117,7 @@
                     {{-- Verified Email Filter --}}
                     <div class="w-48">
                         <select name="email_verified" 
-                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
-                                onchange="this.form.submit()">
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white">
                             <option value="">Email Verification</option>
                             <option value="verified" {{ request('email_verified') == 'verified' ? 'selected' : '' }}>Verified</option>
                             <option value="unverified" {{ request('email_verified') == 'unverified' ? 'selected' : '' }}>Unverified</option>
@@ -147,8 +144,7 @@
                     {{-- Sort --}}
                     <div class="w-40">
                         <select name="sort" 
-                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
-                                onchange="this.form.submit()">
+                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white">
                             <option value="latest" {{ request('sort', 'latest') == 'latest' ? 'selected' : '' }}>Latest</option>
                             <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>Oldest</option>
                             <option value="name_asc" {{ request('sort') == 'name_asc' ? 'selected' : '' }}>Name A-Z</option>
@@ -205,12 +201,11 @@
                     </thead>
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($users as $user)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition" 
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
                                 x-data="{ selected: false }"
-                                x-init="selected = selectedUsers.includes({{ $user->id }})"
-                                @selected-updated.window="selected = selectedUsers.includes({{ $user->id }})">
+                                x-init="selected = selectedUsers.includes({{ $user->id }})">
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <input type="checkbox" 
+                                    <input type="checkbox"
                                            value="{{ $user->id }}"
                                            x-model="selectedUsers"
                                            @change="selected = $el.checked"
@@ -229,7 +224,9 @@
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">
-                                                {{ $user->name }}
+                                                <a href="{{ route('admin.users.show', $user) }}" class="hover:text-red-600">
+                                                    {{ $user->name }}
+                                                </a>
                                             </div>
                                             <div class="text-sm text-gray-500 dark:text-gray-400">
                                                 ID: {{ $user->id }}
@@ -292,7 +289,7 @@
                                             </svg>
                                         </a>
                                         
-                                        @if(auth()->user()->hasRole('super_admin') && !$user->hasRole('super_admin'))
+                                        @if(auth()->user()->isSuperAdmin() && !$user->isSuperAdmin())
                                             <form method="POST" action="{{ route('admin.users.impersonate', $user) }}" 
                                                   onsubmit="return confirm('Impersonate this user? You can stop impersonating from the user menu.')"
                                                   class="inline">
@@ -353,7 +350,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-12 text-center">
+                                <td colspan="8" class="px-6 py-12 text-center">
                                     <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
@@ -448,15 +445,16 @@ function userManagement() {
         bulkAction: '',
         totalUsers: {{ $users->total() }},
         
+        init() {
+            // Initialize any data if needed
+        },
+        
         toggleSelectAll() {
             if (this.selectedUsers.length === this.totalUsers) {
                 this.selectedUsers = [];
             } else {
                 this.selectedUsers = @json($users->pluck('id'));
             }
-            
-            // Trigger update event for checkboxes
-            window.dispatchEvent(new CustomEvent('selected-updated'));
         },
         
         applyBulkAction() {
@@ -480,21 +478,18 @@ function userManagement() {
             const form = document.getElementById('bulk-action-form');
             form.innerHTML = '';
             
-            // Add CSRF token
             const csrfInput = document.createElement('input');
             csrfInput.type = 'hidden';
             csrfInput.name = '_token';
             csrfInput.value = '{{ csrf_token() }}';
             form.appendChild(csrfInput);
             
-            // Add action
             const actionInput = document.createElement('input');
             actionInput.type = 'hidden';
             actionInput.name = 'action';
             actionInput.value = this.bulkAction;
             form.appendChild(actionInput);
             
-            // Add selected user IDs
             this.selectedUsers.forEach(id => {
                 const input = document.createElement('input');
                 input.type = 'hidden';

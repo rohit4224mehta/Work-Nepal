@@ -101,6 +101,29 @@ class User extends Authenticatable implements MustVerifyEmail
         );
     }
 
+    /**
+     * Get the user's age attribute.
+     */
+    protected function age(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?int =>
+                $this->date_of_birth
+                ? $this->date_of_birth->age
+                : null,
+        );
+    }
+
+    /**
+     * Get the user's display name with role.
+     */
+    protected function displayNameWithRole(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->name . ' (' . $this->getRoleDisplayName() . ')',
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Profile Helpers
@@ -235,6 +258,36 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get profile completion level with message.
+     */
+    public function getProfileCompletionLevel(): array
+    {
+        $percentage = $this->profileCompletionPercentage();
+        
+        $level = match(true) {
+            $percentage >= 90 => 'excellent',
+            $percentage >= 75 => 'good',
+            $percentage >= 50 => 'average',
+            $percentage >= 25 => 'poor',
+            default => 'very_poor',
+        };
+
+        $message = match($level) {
+            'excellent' => 'Your profile is complete and ready to impress employers!',
+            'good' => 'Your profile looks good! A few more details will make it perfect.',
+            'average' => 'Your profile is average. Add more details to stand out.',
+            'poor' => 'Your profile needs improvement. Complete it to get better job matches.',
+            'very_poor' => 'Your profile is incomplete. Add your information to get started.',
+        };
+
+        return [
+            'percentage' => $percentage,
+            'level' => $level,
+            'message' => $message,
+        ];
+    }
+
+    /**
      * Determine if user acts as employer
      */
     public function isEmployer(): bool
@@ -274,7 +327,80 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($this->isSuperAdmin()) return 'Super Administrator';
         if ($this->isAdmin()) return 'Administrator';
         if ($this->isEmployer()) return 'Employer';
-        return 'Job Seeker';
+        if ($this->isJobSeeker()) return 'Job Seeker';
+        return 'User';
+    }
+
+    /**
+     * Get user's primary role for display
+     */
+    public function getPrimaryRole(): string
+    {
+        if ($this->isSuperAdmin()) return 'Super Administrator';
+        if ($this->isAdmin()) return 'Administrator';
+        if ($this->isEmployer()) return 'Employer';
+        if ($this->isJobSeeker()) return 'Job Seeker';
+        return 'User';
+    }
+
+    /**
+     * Get user's role badge color.
+     */
+    public function getRoleBadgeColor(): string
+    {
+        if ($this->isSuperAdmin()) return 'purple';
+        if ($this->isAdmin()) return 'red';
+        if ($this->isEmployer()) return 'green';
+        if ($this->isJobSeeker()) return 'blue';
+        return 'gray';
+    }
+
+    /**
+     * Get user's available dashboard options
+     */
+    public function getAvailableDashboards(): array
+    {
+        $dashboards = [];
+        
+        if ($this->isJobSeeker()) {
+            $dashboards['job_seeker'] = [
+                'name' => 'Job Seeker Dashboard',
+                'route' => 'dashboard.jobseeker',
+                'icon' => 'user',
+            ];
+        }
+        
+        if ($this->isEmployer()) {
+            $dashboards['employer'] = [
+                'name' => 'Employer Dashboard',
+                'route' => 'employer.dashboard',
+                'icon' => 'briefcase',
+            ];
+        }
+        
+        if ($this->isAdmin() || $this->isSuperAdmin()) {
+            $dashboards['admin'] = [
+                'name' => 'Admin Dashboard',
+                'route' => 'admin.dashboard',
+                'icon' => 'shield',
+            ];
+        }
+        
+        return $dashboards;
+    }
+
+    /**
+     * Get primary dashboard route
+     */
+    public function getPrimaryDashboardRoute(): string
+    {
+        if ($this->isSuperAdmin() || $this->isAdmin()) {
+            return route('admin.dashboard');
+        }
+        if ($this->isEmployer()) {
+            return route('employer.dashboard');
+        }
+        return route('dashboard.jobseeker');
     }
 
     /*
@@ -437,6 +563,22 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Notification::class)->whereNull('read_at');
     }
 
+    /**
+     * Activity logs for the user
+     */
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class, 'user_id');
+    }
+
+    /**
+     * Admin activity logs performed by this user
+     */
+    public function adminActivityLogs()
+    {
+        return $this->hasMany(ActivityLog::class, 'admin_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Query Scopes
@@ -567,6 +709,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $query->count();
     }
 
+    /**
+     * Get application statistics
+     */
+    public function getApplicationStats(): array
+    {
+        return [
+            'total' => $this->jobApplications()->count(),
+            'applied' => $this->jobApplications()->where('status', 'applied')->count(),
+            'viewed' => $this->jobApplications()->where('status', 'viewed')->count(),
+            'shortlisted' => $this->jobApplications()->where('status', 'shortlisted')->count(),
+            'rejected' => $this->jobApplications()->where('status', 'rejected')->count(),
+            'hired' => $this->jobApplications()->where('status', 'hired')->count(),
+        ];
+    }
+
     public function getRecentApplications($limit = 5)
     {
         return $this->jobApplications()
@@ -607,6 +764,62 @@ class User extends Authenticatable implements MustVerifyEmail
             $query->whereNotIn('id', $appliedIds);
         }
         
-        return $query->latest()->limit($limit)->get();
+        // Calculate match score
+        $jobs = $query->latest()->limit($limit * 2)->get();
+        
+        $jobsWithScore = $jobs->map(function ($job) use ($skillIds, $preference) {
+            $score = 0;
+            
+            // Skills match (50%)
+            if (!empty($skillIds)) {
+                $jobSkillIds = $job->skills()->pluck('skills.id')->toArray();
+                $matchCount = count(array_intersect($skillIds, $jobSkillIds));
+                $score += ($matchCount / count($skillIds)) * 50;
+            }
+            
+            // Location match (25%)
+            if ($preference && $preference->preferred_location) {
+                if (stripos($job->location, $preference->preferred_location) !== false) {
+                    $score += 25;
+                }
+            }
+            
+            // Job type match (25%)
+            if ($preference && $preference->preferred_job_type) {
+                $jobTypes = explode(',', $preference->preferred_job_type);
+                if (in_array($job->job_type, $jobTypes)) {
+                    $score += 25;
+                }
+            }
+            
+            $job->match_score = $score;
+            return $job;
+        });
+        
+        return $jobsWithScore->sortByDesc('match_score')->take($limit);
+    }
+
+    /**
+     * Get user's activity summary.
+     */
+    public function getActivitySummary(): array
+    {
+        return [
+            'last_login' => $this->last_login_at,
+            'last_login_ip' => $this->last_login_ip,
+            'applications_count' => $this->jobApplications()->count(),
+            'saved_jobs_count' => $this->savedJobs()->count(),
+            'companies_count' => $this->ownedCompanies()->count(),
+            'team_member_count' => $this->teamMemberCompanies()->count(),
+            'account_age_days' => $this->created_at->diffInDays(now()),
+        ];
+    }
+
+    /**
+     * Send password reset notification.
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new \Illuminate\Auth\Notifications\ResetPassword($token));
     }
 }

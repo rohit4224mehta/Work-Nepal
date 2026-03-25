@@ -10,6 +10,7 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\DashboardController;
 
 // Job Seeker Controllers
 use App\Http\Controllers\JobSeeker\SavedJobController;
@@ -31,7 +32,7 @@ use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ContentController as AdminContentController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
-use App\Http\Controllers\Admin\ProfileController as AdminProfileController; // Add this
+use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 
 // Notification Controller
 use App\Http\Controllers\NotificationController;
@@ -151,9 +152,17 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
     
-    // Job Seeker Dashboard
-    Route::get('/dashboard', [JobSeekerDashboardController::class, 'index'])->name('dashboard.jobseeker');
-    Route::get('/dashboard/refresh', [JobSeekerDashboardController::class, 'refreshData'])->name('dashboard.refresh');
+    // ==================== DASHBOARD REDIRECT ====================
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats'])->name('dashboard.stats');
+    Route::get('/dashboard/info', [DashboardController::class, 'getDashboardInfo'])->name('dashboard.info');
+    Route::get('/dashboard/quick-stats', [DashboardController::class, 'quickStats'])->name('dashboard.quick-stats');
+    Route::get('/dashboard/available', [DashboardController::class, 'getAvailableDashboards'])->name('dashboard.available');
+    Route::post('/dashboard/switch', [DashboardController::class, 'switchDashboard'])->name('dashboard.switch');
+    
+    // Job Seeker Specific Dashboard (direct access)
+    Route::get('/dashboard/jobseeker', [JobSeekerDashboardController::class, 'index'])->name('dashboard.jobseeker');
+    Route::get('/dashboard/jobseeker/refresh', [JobSeekerDashboardController::class, 'refreshData'])->name('dashboard.jobseeker.refresh');
     
     // Applications
     Route::get('/applications', [ApplicationController::class, 'index'])->name('applications.index');
@@ -162,10 +171,10 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
     Route::delete('/applications/{application}', [ApplicationController::class, 'destroy'])->name('applications.destroy');
     
     // Saved Jobs
-    Route::prefix('saved-jobs')->name('saved.')->group(function () {
-        Route::get('/', [SavedJobController::class, 'index'])->name('jobs');
-        Route::post('/jobs/{jobId}/save', [SavedJobController::class, 'save'])->name('jobs.save');
-        Route::delete('/jobs/{jobId}/unsave', [SavedJobController::class, 'unsave'])->name('jobs.unsave');
+    Route::prefix('saved-jobs')->name('saved-jobs.')->group(function () {
+        Route::get('/', [SavedJobController::class, 'index'])->name('index');
+        Route::post('/{jobId}', [SavedJobController::class, 'save'])->name('save');
+        Route::delete('/{jobId}', [SavedJobController::class, 'unsave'])->name('unsave');
     });
 
     // ==================== 5. EMPLOYER ROUTES ====================
@@ -354,8 +363,6 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
         // ==================== ADMIN PROFILE ROUTES ====================
-        // These are now correctly placed inside the admin middleware group
-        
         Route::prefix('profile')->name('profile.')->group(function () {
             Route::get('/', [AdminProfileController::class, 'show'])->name('show');
             Route::get('/edit', [AdminProfileController::class, 'edit'])->name('edit');
@@ -371,12 +378,21 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
 // ==================== 7. API ROUTES (AJAX) ====================
 
 Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
-    Route::post('/jobs/{jobId}/save', [SavedJobController::class, 'save'])->name('jobs.save');
-    Route::delete('/jobs/{jobId}/unsave', [SavedJobController::class, 'unsave'])->name('jobs.unsave');
+    // Saved Jobs API
+    Route::prefix('saved-jobs')->name('saved-jobs.')->group(function () {
+        Route::post('/{jobId}', [SavedJobController::class, 'save'])->name('save');
+        Route::delete('/{jobId}', [SavedJobController::class, 'unsave'])->name('unsave');
+    });
+    
+    // Job Actions API
     Route::post('/jobs/{job}/quick-apply', [JobController::class, 'quickApply'])->name('jobs.quick-apply');
     Route::post('/jobs/{job}/toggle-save', [JobController::class, 'toggleSave'])->name('jobs.toggle-save');
     Route::get('/jobs/suggestions', [JobController::class, 'suggestions'])->name('jobs.suggestions');
+    
+    // Company API
     Route::get('/companies/suggestions', [CompaniesController::class, 'suggestions'])->name('companies.suggestions');
+    
+    // Dashboard API
     Route::get('/dashboard/refresh', [JobSeekerDashboardController::class, 'refreshData'])->name('dashboard.refresh');
 });
 

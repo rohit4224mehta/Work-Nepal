@@ -1,4 +1,4 @@
-<header class="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-50 transition-all duration-300" x-data="{ scrolled: false, mobileMenuOpen: false, profileDropdownOpen: false }" x-init="window.addEventListener('scroll', () => scrolled = window.scrollY > 10)">
+<header class="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-50 transition-all duration-300" x-data="{ scrolled: false, mobileMenuOpen: false, profileDropdownOpen: false, notificationsOpen: false }" x-init="window.addEventListener('scroll', () => scrolled = window.scrollY > 10)">
     <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16 md:h-20" :class="{ 'shadow-md': scrolled }">
 
@@ -64,19 +64,7 @@
                     @else
                         <!-- Job Seeker Quick Links (Only visible to job seekers) -->
                         @role('job_seeker')
-                            <a href="{{ route('saved.jobs') }}" 
-                               class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 relative group">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                </svg>
-                                <span class="hidden lg:inline">Saved</span>
-                                @if(auth()->user()->savedJobs()->count() > 0)
-                                    <span class="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                        {{ auth()->user()->savedJobs()->count() }}
-                                    </span>
-                                @endif
-                            </a>
-
+                            
                             <a href="{{ route('applications.index') }}"
                                class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 relative group">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,13 +83,13 @@
                         @endrole
 
                         <!-- Notifications Bell (Visible to all authenticated users) -->
-                        <div class="relative" x-data="{ notificationsOpen: false }">
+                        <div class="relative" @click.away="notificationsOpen = false">
                             <button @click="notificationsOpen = !notificationsOpen" 
                                     class="relative text-gray-700 dark:text-gray-300 hover:text-red-600 transition-colors focus:outline-none p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <span class="sr-only">View notifications</span>
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                                 </svg>
-                                
                                 @php
                                     try {
                                         $unreadCount = auth()->user()->unreadNotifications()->count();
@@ -109,9 +97,8 @@
                                         $unreadCount = 0;
                                     }
                                 @endphp
-                                
                                 @if($unreadCount > 0)
-                                    <span class="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold rounded-full min-w-[18px] h-5 px-1.5 flex items-center justify-center animate-pulse">
+                                    <span class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse">
                                         {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                                     </span>
                                 @endif
@@ -119,13 +106,18 @@
 
                             <!-- Notifications Dropdown -->
                             <div x-show="notificationsOpen" 
-                                 @click.away="notificationsOpen = false"
-                                 class="absolute right-0 mt-3 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 transition-all duration-200 origin-top-right z-50"
-                                 x-cloak>
-                                <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                                    <h3 class="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 -translate-y-2"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100 translate-y-0"
+                                 x-transition:leave-end="opacity-0 -translate-y-2"
+                                 class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+                                 style="display: none;">
+                                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
                                     @if($unreadCount > 0)
-                                        <a href="#" class="text-sm text-red-600 hover:text-red-700">Mark all read</a>
+                                        <button class="text-xs text-red-600 hover:text-red-700">Mark all read</button>
                                     @endif
                                 </div>
                                 <div class="max-h-96 overflow-y-auto">
@@ -138,8 +130,8 @@
                                     @endphp
                                     
                                     @forelse($notifications as $notification)
-                                        <a href="#" class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors {{ is_null($notification->read_at) ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
-                                            <p class="text-sm text-gray-900 dark:text-white font-medium">{{ $notification->data['title'] ?? 'Notification' }}</p>
+                                        <a href="{{ $notification->data['url'] ?? '#' }}" class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ is_null($notification->read_at) ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $notification->data['title'] ?? 'Notification' }}</p>
                                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $notification->data['message'] ?? '' }}</p>
                                             <p class="text-xs text-gray-400 mt-1">{{ $notification->created_at->diffForHumans() }}</p>
                                         </a>
@@ -152,18 +144,21 @@
                                         </div>
                                     @endforelse
                                 </div>
-                                @if($notifications->count() > 5)
-                                    <div class="p-3 border-t border-gray-200 dark:border-gray-800 text-center">
-                                        <a href="#" class="text-sm text-red-600 hover:text-red-700">View all</a>
+                                @if(Route::has('notifications.index'))
+                                    <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
+                                        <a href="{{ route('notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 font-medium">
+                                            View all notifications
+                                        </a>
                                     </div>
                                 @endif
                             </div>
                         </div>
 
-                        <!-- Profile Dropdown with Alpine.js (ALL role-specific actions go here) -->
-                        <div class="relative" x-data="{ profileDropdownOpen: false }">
+                        <!-- Profile Dropdown with Alpine.js -->
+                        <div class="relative" @click.away="profileDropdownOpen = false">
                             <button @click="profileDropdownOpen = !profileDropdownOpen" 
                                     class="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 rounded-full p-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                <span class="sr-only">Open user menu</span>
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center overflow-hidden border-2 border-transparent hover:border-red-500 transition-all">
                                     @if(auth()->user()->profile_photo_path)
                                         <img src="{{ auth()->user()->profile_photo_url }}" alt="{{ auth()->user()->name }}" class="w-full h-full object-cover">
@@ -173,42 +168,66 @@
                                         </span>
                                     @endif
                                 </div>
-                                
-                                <svg class="w-4 h-4 text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': profileDropdownOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                </svg>
+                                <span class="hidden lg:flex lg:items-center">
+                                    <span class="text-sm font-semibold leading-6 text-gray-900 dark:text-white" aria-hidden="true"></span>
+                                    <svg class="ml-2 h-4 w-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': profileDropdownOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </span>
                             </button>
 
-                            <!-- Profile Dropdown Menu -->
                             <div x-show="profileDropdownOpen" 
-                                 @click.away="profileDropdownOpen = false"
-                                 class="absolute right-0 mt-3 w-64 bg-white dark:bg-gray-900 rounded-xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 transition-all duration-200 origin-top-right z-50"
-                                 x-cloak>
-                                <div class="py-2">
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 -translate-y-2"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100 translate-y-0"
+                                 x-transition:leave-end="opacity-0 -translate-y-2"
+                                 class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+                                 style="display: none;">
+                                <div class="py-1">
                                     <!-- User Info Header -->
-                                    <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800">
+                                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                                         <p class="text-sm font-medium text-gray-900 dark:text-white">{{ auth()->user()->name }}</p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ auth()->user()->email }}</p>
-                                        <div class="mt-2">
-                                            <span class="inline-flex items-center px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs rounded-full">
-                                                {{ auth()->user()->getRoleDisplayName() ?? 'Job Seeker' }}
+                                        <div class="mt-2 flex items-center gap-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                                @if(auth()->user()->hasRole('super_admin')) bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400
+                                                @elseif(auth()->user()->hasRole('admin')) bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400
+                                                @elseif(auth()->user()->hasRole('employer')) bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400
+                                                @else bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400
+                                                @endif">
+                                                {{ auth()->user()->getRoleDisplayName() }}
                                             </span>
+                                            @if(auth()->user()->account_status == 'active')
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                    Active
+                                                </span>
+                                            @endif
                                         </div>
                                     </div>
 
-                                    <!-- Common Menu Items (Visible to all authenticated users) -->
+                                    <!-- Common Menu Items -->
+                                    <a href="{{ route('dashboard') }}" 
+                                       class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2 2 2 4-4 4 4 2-2 2 2M5 12v6h4v-4h6v4h4v-6" />
+                                        </svg>
+                                        Dashboard
+                                    </a>
+
                                     <a href="{{ route('profile.show', auth()->user()) }}" 
-                                       class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                       class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                         </svg>
-                                        View Profile
+                                        My Profile
                                     </a>
 
                                     
 
                                     <a href="{{ route('settings.index') }}"
-                                       class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                       class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -218,18 +237,18 @@
 
                                     <!-- JOB SEEKER SPECIFIC ACTIONS -->
                                     @role('job_seeker')
-                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                         
                                         <a href="{{ route('dashboard.jobseeker') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                             </svg>
                                             Job Seeker Dashboard
                                         </a>
                                         
-                                        <a href="{{ route('saved.jobs') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                        <a href="{{ route('saved-jobs.index') }}" 
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                                             </svg>
@@ -242,7 +261,7 @@
                                         </a>
                                         
                                         <a href="{{ route('applications.index') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
@@ -261,45 +280,33 @@
                                     <!-- EMPLOYER SPECIFIC ACTIONS -->
                                     @role('employer|recruiter')
                                         @php
-                                            // Safe way to get company IDs without using undefined method
                                             $user = auth()->user();
-                                            $companyIds = collect([]);
-                                            
-                                            try {
-                                                // Get owned companies
-                                                $ownedIds = $user->ownedCompanies()->pluck('id');
-                                                
-                                                // Get team member companies
-                                                $teamIds = $user->teamMemberCompanies()->pluck('id');
-                                                
-                                                // Merge both collections
-                                                $companyIds = $ownedIds->merge($teamIds);
-                                            } catch (\Exception $e) {
-                                                $companyIds = collect([]);
-                                            }
+                                            $companyIds = $user->ownedCompanies()->pluck('id')
+                                                ->merge($user->teamMemberCompanies()->pluck('id'));
                                         @endphp
                                         
-                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                         
                                         <a href="{{ route('employer.dashboard') }}" 
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
                                             Company Dashboard
                                         </a>
                                         
-                                        <!-- EMPLOYER ACTION BUTTONS -->
                                         <a href="{{ route('employer.jobs.create') }}"
-                                           class="block px-5 py-3 text-sm text-white bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 mx-3 my-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                            </svg>
-                                            Post a New Job
+                                           class="block px-4 py-2 text-sm text-white bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 mx-2 my-1 rounded-lg font-medium transition-colors text-center">
+                                            <span class="flex items-center justify-center gap-2">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                Post a New Job
+                                            </span>
                                         </a>
                                         
                                         <a href="{{ route('employer.jobs.index') }}"
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
@@ -320,7 +327,7 @@
                                         </a>
                                         
                                         <a href="{{ route('employer.applicants.index') }}"
-                                           class="block px-5 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                             </svg>
@@ -329,16 +336,9 @@
                                                 $newApplicants = 0;
                                                 if ($companyIds->isNotEmpty()) {
                                                     try {
-                                                        if (method_exists(\App\Models\JobApplication::class, 'jobPosting')) {
-                                                            $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companyIds) {
-                                                                $q->whereIn('company_id', $companyIds);
-                                                            })->where('status', 'applied')->count();
-                                                        } else {
-                                                            $newApplicants = \App\Models\JobApplication::join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
-                                                                ->whereIn('job_postings.company_id', $companyIds)
-                                                                ->where('job_applications.status', 'applied')
-                                                                ->count();
-                                                        }
+                                                        $newApplicants = \App\Models\JobApplication::whereHas('jobPosting', function($q) use ($companyIds) {
+                                                            $q->whereIn('company_id', $companyIds);
+                                                        })->where('status', 'applied')->count();
                                                     } catch (\Exception $e) {
                                                         $newApplicants = 0;
                                                     }
@@ -354,10 +354,10 @@
 
                                     <!-- ADMIN SPECIFIC ACTIONS -->
                                     @role('admin|super_admin')
-                                        <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                        <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                         
                                         <a href="{{ route('admin.dashboard') }}" 
-                                           class="block px-5 py-3 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors flex items-center gap-3">
+                                           class="flex items-center gap-3 px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
@@ -365,12 +365,11 @@
                                         </a>
                                     @endrole
 
-                                    <div class="border-t border-gray-200 dark:border-gray-800 my-1"></div>
+                                    <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
 
-                                    <!-- Logout -->
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
-                                        <button type="submit" class="w-full text-left px-5 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-3">
+                                        <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-3">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                             </svg>
@@ -384,7 +383,7 @@
                 </div>
             </div>
 
-            <!-- Mobile Menu Button with animation -->
+            <!-- Mobile Menu Button -->
             <button @click="mobileMenuOpen = !mobileMenuOpen" 
                     class="md:hidden text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500 rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     aria-label="Toggle menu">
@@ -398,7 +397,7 @@
         </div>
     </nav>
 
-    <!-- Mobile Menu with Alpine.js -->
+    <!-- Mobile Menu -->
     <div x-show="mobileMenuOpen" 
          @click.away="mobileMenuOpen = false"
          x-transition:enter="transition ease-out duration-200"
@@ -444,20 +443,20 @@
             </a>
 
             @auth
-                <!-- Role-specific links for mobile (simplified) -->
+                <!-- Role-specific links for mobile -->
                 @role('job_seeker')
                     <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
-                        <a href="{{ route('dashboard.jobseeker') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
+                        <a href="{{ route('dashboard') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             Dashboard
                         </a>
-                        <a href="{{ route('saved.jobs') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
+                        {{-- <a href="{{ route('saved-jobs.index') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             Saved Jobs
                             @if(auth()->user()->savedJobs()->count() > 0)
                                 <span class="ml-2 inline-flex items-center px-2 py-1 bg-red-600 text-white text-xs rounded-full">
                                     {{ auth()->user()->savedJobs()->count() }}
                                 </span>
                             @endif
-                        </a>
+                        </a> --}}
                         <a href="{{ route('applications.index') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                             My Applications
                             @php
@@ -479,8 +478,8 @@
                             ->merge($user->teamMemberCompanies()->pluck('id'));
                     @endphp
                     <div class="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
-                        <a href="{{ route('employer.dashboard') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
-                            Company Dashboard
+                        <a href="{{ route('dashboard') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
+                            Dashboard
                         </a>
                         <a href="{{ route('employer.jobs.create') }}" class="block text-lg font-medium bg-red-600 text-white px-4 py-3 rounded-xl text-center hover:bg-red-700 transition-colors">
                             + Post a Job
@@ -513,8 +512,8 @@
 
                 @role('admin|super_admin')
                     <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
-                        <a href="{{ route('admin.dashboard') }}" class="block text-lg font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 transition-colors py-2">
-                            Admin Panel
+                        <a href="{{ route('dashboard') }}" class="block text-lg font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 transition-colors py-2">
+                            Dashboard
                         </a>
                     </div>
                 @endrole
@@ -524,7 +523,9 @@
                     <a href="{{ route('profile.show', auth()->user()) }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                         My Profile
                     </a>
-                    
+                    <a href="{{ route('profile.edit') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
+                        Edit Profile
+                    </a>
                     <a href="{{ route('settings.index') }}" class="block text-lg font-medium text-gray-900 dark:text-white hover:text-red-600 transition-colors py-2">
                         Settings
                     </a>
@@ -548,7 +549,7 @@
                 </div>
             @endauth
 
-           
+            
         </div>
     </div>
 </header>

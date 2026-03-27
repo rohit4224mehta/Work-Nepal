@@ -462,16 +462,43 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Check if user can access a specific company
-     */
-    public function canAccessCompany(Company $company): bool
-    {
-        return $this->id === $company->owner_id
-            || $this->teamMemberCompanies()
-                ->where('company_id', $company->id)
-                ->wherePivot('is_active', true)
-                ->exists();
+   
+ * Check if user can manage a company (owner or active team member with manage permissions)
+ */
+public function canManageCompany(Company $company): bool
+{
+    // Owner can manage
+    if ($this->id === $company->owner_id) {
+        return true;
     }
+    
+    // Team member with manage permissions
+    $teamMember = $this->teamMemberCompanies()
+        ->where('company_id', $company->id)
+        ->wherePivot('is_active', true)
+        ->first();
+    
+    if (!$teamMember) {
+        return false;
+    }
+    
+    // Check if team member has manage permissions
+    $permissions = json_decode($teamMember->pivot->permissions, true);
+    
+    return isset($permissions['manage_jobs']) && $permissions['manage_jobs'] === true;
+}
+
+/**
+ * Check if user can access a company (view applications, etc.)
+ */
+public function canAccessCompany(Company $company): bool
+{
+    return $this->id === $company->owner_id
+        || $this->teamMemberCompanies()
+            ->where('company_id', $company->id)
+            ->wherePivot('is_active', true)
+            ->exists();
+}
 
     /**
      * Get current active company for the user
@@ -481,6 +508,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->companies()
             ->wherePivot('is_active', true)
             ->first();
+    }
+    public function allCompanies()
+    {
+        // This returns a relationship that can be used in Blade
+        return $this->hasMany(Company::class, 'owner_id')
+            ->union($this->belongsToMany(Company::class, 'company_team_members', 'user_id', 'company_id'));
     }
 
     /*
@@ -501,10 +534,9 @@ class User extends Authenticatable implements MustVerifyEmail
      * Job applications submitted by the user
      */
     public function jobApplications()
-    {
-        return $this->hasMany(JobApplication::class);
-    }
-
+{
+    return $this->hasMany(JobApplication::class, 'user_id');
+}
     /**
      * Skills possessed by the user
      */
@@ -542,10 +574,10 @@ class User extends Authenticatable implements MustVerifyEmail
      * Saved jobs/bookmarked by the user
      */
     public function savedJobs()
-    {
-        return $this->belongsToMany(JobPosting::class, 'saved_jobs')
-                    ->withTimestamps();
-    }
+{
+    return $this->belongsToMany(JobPosting::class, 'saved_jobs', 'user_id', 'job_posting_id')
+                ->withTimestamps();
+}
 
     /**
      * Notifications for the user

@@ -73,31 +73,39 @@
                 </p>
             </form>
 
-            <!-- Social Login Placeholder (for Google OAuth later) -->
-            <div class="mt-8">
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="bg-white dark:bg-gray-800 px-4 text-gray-500 dark:text-gray-400">
-                            Or continue with
-                        </span>
-                    </div>
-                </div>
+            <!-- Social Login -->
+<div class="mt-8">
+    <div class="relative">
+        <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
+        </div>
+        <div class="relative flex justify-center text-sm">
+            <span class="bg-white dark:bg-gray-800 px-4 text-gray-500 dark:text-gray-400">
+                Or continue with
+            </span>
+        </div>
+    </div>
 
-                <div class="mt-6">
-                    <a href="#" class="w-full flex justify-center items-center gap-3 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <svg class="w-5 h-5" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.51h5.84c-.25 1.31-.98 2.42-2.07 3.16v2.63h3.35c1.96-1.81 3.09-4.47 3.09-7.8z"/>
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-1.01 7.28-2.73l-3.35-2.63c-1.01.68-2.29 1.08-3.93 1.08-3.02 0-5.58-2.04-6.49-4.79H.96v2.67C2.74 20.98 7.1 23 12 23z"/>
-                            <path fill="#FBBC05" d="M5.51 14.21c-.23-.68-.36-1.41-.36-2.21s.13-1.53.36-2.21V7.34H.96C.35 8.85 0 10.39 0 12s.35 3.15.96 4.66l4.55-2.45z"/>
-                            <path fill="#EA4335" d="M12 4.98c1.64 0 3.11.56 4.27 1.66l3.19-3.19C17.46 1.01 14.97 0 12 0 7.1 0 2.74 2.02.96 5.34l4.55 2.45C6.42 5.02 8.98 4.98 12 4.98z"/>
-                        </svg>
-                        <span class="text-gray-700 dark:text-gray-300 font-medium">Continue with Google</span>
-                    </a>
-                </div>
-            </div>
+    <div class="mt-6">
+        <a href="{{ url('/auth/google') }}" onclick="this.innerHTML='Redirecting...';"
+           class="group w-full flex justify-center items-center gap-3 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md">
+
+            <!-- Google Icon -->
+            <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.51h5.84c-.25 1.31-.98 2.42-2.07 3.16v2.63h3.35c1.96-1.81 3.09-4.47 3.09-7.8z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-1.01 7.28-2.73l-3.35-2.63c-1.01.68-2.29 1.08-3.93 1.08-3.02 0-5.58-2.04-6.49-4.79H.96v2.67C2.74 20.98 7.1 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.51 14.21c-.23-.68-.36-1.41-.36-2.21s.13-1.53.36-2.21V7.34H.96C.35 8.85 0 10.39 0 12s.35 3.15.96 4.66l4.55-2.45z"/>
+                <path fill="#EA4335" d="M12 4.98c1.64 0 3.11.56 4.27 1.66l3.19-3.19C17.46 1.01 14.97 0 12 0 7.1 0 2.74 2.02.96 5.34l4.55 2.45C6.42 5.02 8.98 4.98 12 4.98z"/>
+            </svg>
+
+            <!-- Text -->
+            <span class="text-gray-700 dark:text-gray-300 font-medium">
+                Continue with Google
+            </span>
+        </a>
+    </div>
+</div>
         </div>
     </div>
 </div>

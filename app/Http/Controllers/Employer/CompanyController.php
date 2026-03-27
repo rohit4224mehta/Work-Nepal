@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth; // <-- IMPORT THIS
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -204,14 +205,14 @@ class CompanyController extends Controller
                 'description' => $data['description'],
                 'logo_path' => $data['logo_path'] ?? null,
                 'cover_path' => $data['cover_path'] ?? null,
-                'culture_images' => $data['culture_images'] ?? null,
+                'culture_images' => json_encode($data['culture_images'] ?? []),
                 'video_link' => $data['video_link'] ?? null,
-                'social_links' => $data['social_links'] ?? null,
+                'social_links' => json_encode($data['social_links'] ?? []),
                 'owner_id' => auth()->id(),
                 'verification_status' => 'pending',
             ]);
 
-            // Attach user as owner in company_user table
+            // Attach user as owner in company_team_members table
             $company->teamMembers()->attach(auth()->id(), [
                 'role' => 'owner',
                 'is_active' => true,
@@ -233,6 +234,7 @@ class CompanyController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Company creation failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to create company. Please try again.');
         }
     }
@@ -264,6 +266,112 @@ class CompanyController extends Controller
         return view('employer.company.preview', compact('company'));
     }
 
+    /**
+     * Show the form for editing company profile
+     */
+    public function edit(Company $company)
+    {
+        // Check if user owns this company
+        if ($company->owner_id !== Auth::id()) {
+            abort(403, 'You do not have permission to edit this company.');
+        }
+        
+        return view('employer.company.edit', compact('company'));
+    }
+    
+    /**
+     * Update the specified company
+     */
+    public function update(Request $request, Company $company)
+    {
+        // Check if user owns this company
+        if ($company->owner_id !== Auth::id()) {
+            abort(403, 'You do not have permission to update this company.');
+        }
+        
+        // Validate the request
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'industry' => 'nullable|string|max:255',
+            'size' => 'nullable|string|max:255',
+            'founded_year' => 'nullable|integer|min:1900|max:' . date('Y'),
+            'location' => 'nullable|string|max:255',
+            'headquarters' => 'nullable|string|max:255',
+            'website' => 'nullable|url|max:255',
+            'contact_email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'social_links' => 'nullable|array',
+            'social_links.facebook' => 'nullable|url|max:255',
+            'social_links.twitter' => 'nullable|url|max:255',
+            'social_links.linkedin' => 'nullable|url|max:255',
+            'social_links.instagram' => 'nullable|url|max:255',
+        ]);
+        
+        // Prepare data for update
+        $updateData = [
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+            'industry' => $validated['industry'] ?? $company->industry,
+            'size' => $validated['size'] ?? $company->size,
+            'founded_year' => $validated['founded_year'] ?? $company->founded_year,
+            'location' => $validated['location'] ?? $company->location,
+            'headquarters' => $validated['headquarters'] ?? $company->headquarters,
+            'website' => $validated['website'] ?? $company->website,
+            'contact_email' => $validated['contact_email'] ?? $company->contact_email,
+            'phone' => $validated['phone'] ?? $company->phone,
+            'description' => $validated['description'] ?? $company->description,
+        ];
+        
+        // Handle logo upload
+        if ($request->hasFile('logo')) {
+            // Delete old logo if exists
+            if ($company->logo_path) {
+                Storage::disk('public')->delete($company->logo_path);
+            }
+            
+            $logoPath = $request->file('logo')->store('company-logos', 'public');
+            $updateData['logo_path'] = $logoPath;
+        }
+        
+        // Handle cover image upload
+        if ($request->hasFile('cover')) {
+            // Delete old cover if exists
+            if ($company->cover_path) {
+                Storage::disk('public')->delete($company->cover_path);
+            }
+            
+            $coverPath = $request->file('cover')->store('company-covers', 'public');
+            $updateData['cover_path'] = $coverPath;
+        }
+        
+        // Handle social links
+        if (isset($validated['social_links'])) {
+            $updateData['social_links'] = json_encode(array_filter($validated['social_links']));
+        }
+        
+        // Update the company
+        $company->update($updateData);
+        
+        // Log the activity (if activity log is installed)
+        if (class_exists('Spatie\Activitylog\ActivitylogServiceProvider')) {
+            activity()
+                ->performedOn($company)
+                ->causedBy(Auth::user())
+                ->withProperties([
+                    'ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ])
+                ->log('Company profile updated');
+        }
+        
+        return redirect()
+            ->route('employer.dashboard')
+            ->with('success', 'Company profile updated successfully!');
+    }
+    
     /**
      * Show team management page
      */

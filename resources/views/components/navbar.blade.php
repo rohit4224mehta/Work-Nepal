@@ -52,6 +52,7 @@
 
                     @guest
                         <!-- Guest State -->
+                        
                         <a href="{{ route('login') }}"
                            class="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-500 font-medium transition-colors px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
                             Log in
@@ -239,13 +240,13 @@
                                     @role('job_seeker')
                                         <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                         
-                                        <a href="{{ route('dashboard.jobseeker') }}" 
+                                        {{-- <a href="{{ route('dashboard.jobseeker') }}" 
                                            class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                             </svg>
                                             Job Seeker Dashboard
-                                        </a>
+                                        </a> --}}
                                         
                                         <a href="{{ route('saved-jobs.index') }}" 
                                            class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
@@ -287,14 +288,14 @@
                                         
                                         <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                         
-                                        <a href="{{ route('employer.dashboard') }}" 
+                                        {{-- <a href="{{ route('employer.dashboard') }}" 
                                            class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
                                             Company Dashboard
                                         </a>
-                                        
+                                         --}}
                                         <a href="{{ route('employer.jobs.create') }}"
                                            class="block px-4 py-2 text-sm text-white bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 mx-2 my-1 rounded-lg font-medium transition-colors text-center">
                                             <span class="flex items-center justify-center gap-2">

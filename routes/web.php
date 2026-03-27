@@ -55,13 +55,30 @@ use App\Http\Controllers\NotificationController;
 // Home Page
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-// Jobs (public search & view)
+// In routes/web.php
+
 Route::prefix('jobs')->name('jobs.')->group(function () {
+    
+    // Public routes
     Route::get('/', [JobController::class, 'index'])->name('index');
-    Route::get('/{job:slug}', [JobController::class, 'show'])->name('show');
     Route::get('/suggestions', [JobController::class, 'suggestions'])->name('suggestions');
-    Route::post('/{job}/quick-apply', [JobController::class, 'quickApply'])->name('quick-apply');
-    Route::post('/{job}/toggle-save', [JobController::class, 'toggleSave'])->name('toggle-save');
+    Route::get('/{job:slug}', [JobController::class, 'show'])->name('show');
+    
+    // Report route
+    Route::post('/report', [JobController::class, 'report'])->name('report');
+    
+    // Protected routes with rate limiting
+    Route::middleware(['auth', 'verified'])->group(function () {
+        // ✅ FIX: Use slug for apply route
+        Route::post('/{job:slug}/apply', [JobController::class, 'apply'])
+            ->name('apply')
+            ->middleware('throttle:10,1');
+        
+        // ✅ FIX: Use slug for toggle-save route
+        Route::post('/{job:slug}/toggle-save', [JobController::class, 'toggleSave'])
+            ->name('toggle-save')
+            ->middleware('throttle:20,1');
+    });
 });
 
 // Companies (public profiles)
@@ -181,26 +198,42 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
     
     Route::prefix('employer')->name('employer.')->group(function () {
         
-        // Multi-step company creation (accessible to all authenticated users)
-        Route::get('/company/create', [EmployerCompanyController::class, 'create'])->name('company.create');
-        Route::post('/company/step1', [EmployerCompanyController::class, 'storeStep1'])->name('company.store.step1');
-        Route::get('/company/details', [EmployerCompanyController::class, 'details'])->name('company.details');
-        Route::post('/company/step2', [EmployerCompanyController::class, 'storeStep2'])->name('company.store.step2');
-        Route::get('/company/branding', [EmployerCompanyController::class, 'branding'])->name('company.branding');
-        Route::post('/company/step3', [EmployerCompanyController::class, 'storeStep3'])->name('company.store.step3');
-        Route::get('/company/review', [EmployerCompanyController::class, 'review'])->name('company.review');
-        Route::post('/company/final', [EmployerCompanyController::class, 'storeFinal'])->name('company.store.final');
-        Route::get('/company/{company}/success', [EmployerCompanyController::class, 'success'])->name('company.success');
-        Route::get('/company/{company}/preview', [EmployerCompanyController::class, 'preview'])->name('company.preview');
+        // ========== COMPANY MANAGEMENT (Accessible to all authenticated users) ==========
+        Route::prefix('company')->name('company.')->group(function () {
+            // Create Company Routes
+            Route::get('/create', [EmployerCompanyController::class, 'create'])->name('create');
+            Route::post('/step1', [EmployerCompanyController::class, 'storeStep1'])->name('store.step1');
+            Route::get('/details', [EmployerCompanyController::class, 'details'])->name('details');
+            Route::post('/step2', [EmployerCompanyController::class, 'storeStep2'])->name('store.step2');
+            Route::get('/branding', [EmployerCompanyController::class, 'branding'])->name('branding');
+            Route::post('/step3', [EmployerCompanyController::class, 'storeStep3'])->name('store.step3');
+            Route::get('/review', [EmployerCompanyController::class, 'review'])->name('review');
+            Route::post('/final', [EmployerCompanyController::class, 'storeFinal'])->name('store.final');
+            Route::get('/{company}/success', [EmployerCompanyController::class, 'success'])->name('success');
+            Route::get('/{company}/preview', [EmployerCompanyController::class, 'preview'])->name('preview');
+            
+            // ========== EDIT COMPANY ROUTES (FIXED - Now outside role middleware) ==========
+            Route::get('/{company}/edit', [EmployerCompanyController::class, 'edit'])->name('edit');
+            Route::put('/{company}', [EmployerCompanyController::class, 'update'])->name('update');
+            // ==============================================================================
+            
+            // Team Management Routes
+            Route::get('/{company}/team', [EmployerCompanyController::class, 'team'])->name('team');
+            Route::post('/{company}/team/add', [EmployerCompanyController::class, 'addTeamMember'])->name('team.add');
+            Route::delete('/{company}/team/{user}', [EmployerCompanyController::class, 'removeTeamMember'])->name('team.remove');
+            Route::post('/{company}/team/{user}/toggle', [EmployerCompanyController::class, 'toggleTeamMemberStatus'])->name('team.toggle');
+            Route::post('/{company}/team/{user}/role', [EmployerCompanyController::class, 'updateTeamMemberRole'])->name('team.role');
+        });
         
         // Aliases for backward compatibility
         Route::get('/post-job', fn() => redirect()->route('employer.jobs.create'))->name('post.job');
         Route::get('/applicants', fn() => redirect()->route('employer.applicants.index'))->name('applicants');
 
-        // Employer Dashboard (only employers can access)
+        // ========== EMPLOYER DASHBOARD (Role-based) ==========
+        Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
+        
+        // ========== EMPLOYER-ONLY ROUTES ==========
         Route::middleware(['role:employer'])->group(function () {
-            
-            Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
             
             // Job Management
             Route::resource('jobs', EmployerJobController::class)->except(['show']);
@@ -210,13 +243,6 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
             Route::get('/applicants', [EmployerApplicantController::class, 'index'])->name('applicants.index');
             Route::get('/applicants/{application}', [EmployerApplicantController::class, 'show'])->name('applicants.show');
             Route::patch('/applicants/{application}/status', [EmployerApplicantController::class, 'updateStatus'])->name('applicants.status');
-            
-            // Team Management
-            Route::get('/company/{company}/team', [EmployerCompanyController::class, 'team'])->name('company.team');
-            Route::post('/company/{company}/team/add', [EmployerCompanyController::class, 'addTeamMember'])->name('company.team.add');
-            Route::delete('/company/{company}/team/{user}', [EmployerCompanyController::class, 'removeTeamMember'])->name('company.team.remove');
-            Route::post('/company/{company}/team/{user}/toggle', [EmployerCompanyController::class, 'toggleTeamMemberStatus'])->name('company.team.toggle');
-            Route::post('/company/{company}/team/{user}/role', [EmployerCompanyController::class, 'updateTeamMemberRole'])->name('company.team.role');
         });
     });
 

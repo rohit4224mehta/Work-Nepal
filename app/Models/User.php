@@ -580,20 +580,28 @@ public function canAccessCompany(Company $company): bool
 }
 
     /**
-     * Notifications for the user
-     */
-    public function notifications()
-    {
-        return $this->hasMany(Notification::class)->latest();
-    }
+ * Get notifications for the user
+ */
+public function notifications()
+{
+    return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
+}
 
-    /**
-     * Unread notifications for the user
-     */
-    public function unreadNotifications()
-    {
-        return $this->hasMany(Notification::class)->whereNull('read_at');
-    }
+/**
+ * Get unread notifications
+ */
+public function unreadNotifications()
+{
+    return $this->hasMany(Notification::class)->where('is_read', false);
+}
+
+/**
+ * Get unread notification count
+ */
+public function getUnreadNotificationCountAttribute()
+{
+    return $this->unreadNotifications()->count();
+}
 
     /**
      * Activity logs for the user

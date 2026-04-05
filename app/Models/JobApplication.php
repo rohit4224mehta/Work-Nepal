@@ -45,10 +45,21 @@ class JobApplication extends Model
     /**
      * Get the applicant (user) who submitted this application.
      */
-    public function applicant()
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
+   /**
+ * Get the applicant (user) who submitted this application.
+ */
+public function applicant()
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
+
+/**
+ * Alias for applicant relationship (for backward compatibility)
+ */
+public function user()
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
 
     /**
      * Get the company through the job posting.

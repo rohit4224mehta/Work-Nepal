@@ -1,98 +1,115 @@
 <?php
-// app/Models/Notification.php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Notification extends Model
 {
-    use HasFactory;
-
     protected $table = 'notifications';
     
     protected $fillable = [
-        'user_id',
-        'type',
-        'title',
-        'message',
-        'data',
-        'read_at',
-        'notifiable_id',
-        'notifiable_type',
+        'user_id', 'type', 'title', 'message', 'data', 'is_read', 'read_at'
     ];
-
+    
     protected $casts = [
         'data' => 'array',
+        'is_read' => 'boolean',
         'read_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
-
+    
     /**
-     * Get the user that owns the notification.
+     * Get the user who owns the notification
      */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-
+    
     /**
-     * Get the notifiable entity.
-     */
-    public function notifiable()
-    {
-        return $this->morphTo();
-    }
-
-    /**
-     * Mark the notification as read.
+     * Mark notification as read
      */
     public function markAsRead()
     {
-        if (is_null($this->read_at)) {
-            $this->forceFill(['read_at' => now()])->save();
-        }
+        $this->update([
+            'is_read' => true,
+            'read_at' => now(),
+        ]);
     }
-
+    
     /**
-     * Mark the notification as unread.
-     */
-    public function markAsUnread()
-    {
-        if (!is_null($this->read_at)) {
-            $this->forceFill(['read_at' => null])->save();
-        }
-    }
-
-    /**
-     * Determine if the notification has been read.
-     */
-    public function read()
-    {
-        return $this->read_at !== null;
-    }
-
-    /**
-     * Determine if the notification has not been read.
-     */
-    public function unread()
-    {
-        return $this->read_at === null;
-    }
-
-    /**
-     * Scope a query to only include unread notifications.
+     * Scope for unread notifications
      */
     public function scopeUnread($query)
     {
-        return $query->whereNull('read_at');
+        return $query->where('is_read', false);
     }
-
+    
     /**
-     * Scope a query to only include read notifications.
+     * Get action URL based on notification type
      */
-    public function scopeRead($query)
+    public function getActionUrl()
     {
-        return $query->whereNotNull('read_at');
+        $data = $this->data;
+        
+        switch ($this->type) {
+            case 'job_applied':
+            case 'application_viewed':
+            case 'application_shortlisted':
+            case 'application_rejected':
+            case 'application_hired':
+                return isset($data['job_id']) ? route('jobs.show', $data['job_id']) : '#';
+                
+            case 'new_application':
+                return isset($data['application_id']) 
+                    ? route('employer.applicants.show', $data['application_id']) 
+                    : '#';
+                
+            case 'company_verified':
+                return route('employer.dashboard');
+                
+            case 'job_expired':
+                return route('employer.jobs.index');
+                
+            default:
+                return '#';
+        }
+    }
+    
+    /**
+     * Get icon based on notification type
+     */
+    public function getIcon()
+    {
+        return match($this->type) {
+            'job_applied' => '📝',
+            'application_viewed' => '👀',
+            'application_shortlisted' => '⭐',
+            'application_rejected' => '❌',
+            'application_hired' => '🎉',
+            'new_application' => '📩',
+            'company_verified' => '✅',
+            'job_expired' => '⚠️',
+            default => '🔔',
+        };
+    }
+    
+    /**
+     * Get color based on notification type
+     */
+    public function getColor()
+    {
+        return match($this->type) {
+            'job_applied' => 'blue',
+            'application_viewed' => 'purple',
+            'application_shortlisted' => 'green',
+            'application_rejected' => 'red',
+            'application_hired' => 'emerald',
+            'new_application' => 'orange',
+            'company_verified' => 'teal',
+            'job_expired' => 'yellow',
+            default => 'gray',
+        };
     }
 }

@@ -112,31 +112,164 @@ class DashboardController extends Controller
     /**
      * Get recent applications
      */
-    protected function getRecentApplications($company)
+   // In DashboardController.php
+
+protected function getRecentApplications($company)
+{
+    if (!$company) {
+        return collect([]);
+    }
+    
+    $jobIds = $company->jobPostings->pluck('id')->toArray();
+    
+    if (empty($jobIds)) {
+        return collect([]);
+    }
+    
+    // Return actual models instead of stdClass
+    return JobApplication::with(['applicant', 'jobPosting'])
+        ->whereIn('job_posting_id', $jobIds)
+        ->orderBy('created_at', 'desc')
+        ->limit(5)
+        ->get();
+}
+    /**
+     * Get dashboard stats for API
+     */
+    public function getStats(Request $request)
     {
+        $user = Auth::user();
+        $company = Company::where('owner_id', $user->id)->first();
+        $stats = $this->calculateStats($company);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $stats
+        ]);
+    }
+    
+    /**
+     * Export dashboard data to CSV
+     */
+    public function export(Request $request)
+    {
+        $user = Auth::user();
+        $company = Company::where('owner_id', $user->id)->first();
+        
         if (!$company) {
-            return collect([]);
+            return back()->with('error', 'No company found');
+        }
+        
+        $jobs = $company->jobPostings()
+            ->with(['applications.applicant'])
+            ->get();
+        
+        $filename = 'employer_report_' . now()->format('Y-m-d') . '.csv';
+        $handle = fopen('php://temp', 'w+');
+        
+        // Add headers
+        fputcsv($handle, [
+            'Job Title', 'Job Type', 'Location', 'Posted Date', 
+            'Status', 'Applications Count', 'Shortlisted', 'Hired'
+        ]);
+        
+        // Add data
+        foreach ($jobs as $job) {
+            fputcsv($handle, [
+                $job->title,
+                $job->job_type,
+                $job->location,
+                $job->created_at->format('Y-m-d'),
+                $job->status,
+                $job->applications->count(),
+                $job->applications->where('status', 'shortlisted')->count(),
+                $job->applications->where('status', 'hired')->count(),
+            ]);
+        }
+        
+        rewind($handle);
+        $content = stream_get_contents($handle);
+        fclose($handle);
+        
+        return response($content)
+            ->withHeaders([
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+    }
+    
+    /**
+     * Get recent activity
+     */
+    public function recentActivity(Request $request)
+    {
+        $user = Auth::user();
+        $company = Company::where('owner_id', $user->id)->first();
+        
+        if (!$company) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
         }
         
         $jobIds = $company->jobPostings->pluck('id')->toArray();
         
-        if (empty($jobIds)) {
-            return collect([]);
-        }
-        
-        return JobApplication::with(['user', 'jobPosting'])
+        $recentApplications = JobApplication::with(['applicant', 'jobPosting'])
             ->whereIn('job_posting_id', $jobIds)
             ->orderBy('created_at', 'desc')
-            ->limit(5)
+            ->limit(10)
             ->get()
             ->map(function($application) {
-                return (object) [
+                return [
                     'id' => $application->id,
-                    'applicant' => $application->user,
+                    'applicant_name' => $application->applicant->name,
                     'job_title' => $application->jobPosting->title,
                     'status' => $application->status,
-                    'created_at' => $application->created_at,
+                    'applied_at' => $application->created_at->diffForHumans(),
                 ];
             });
+        
+        return response()->json([
+            'success' => true,
+            'data' => $recentApplications
+        ]);
+    }
+    
+    /**
+     * Get application statistics
+     */
+    public function applicationStats(Request $request)
+    {
+        $user = Auth::user();
+        $company = Company::where('owner_id', $user->id)->first();
+        
+        if (!$company) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => 0,
+                    'applied' => 0,
+                    'shortlisted' => 0,
+                    'rejected' => 0,
+                    'hired' => 0,
+                ]
+            ]);
+        }
+        
+        $jobIds = $company->jobPostings->pluck('id')->toArray();
+        
+        $stats = [
+            'total' => JobApplication::whereIn('job_posting_id', $jobIds)->count(),
+            'applied' => JobApplication::whereIn('job_posting_id', $jobIds)->where('status', 'applied')->count(),
+            'shortlisted' => JobApplication::whereIn('job_posting_id', $jobIds)->where('status', 'shortlisted')->count(),
+            'rejected' => JobApplication::whereIn('job_posting_id', $jobIds)->where('status', 'rejected')->count(),
+            'hired' => JobApplication::whereIn('job_posting_id', $jobIds)->where('status', 'hired')->count(),
+        ];
+        
+        return response()->json([
+            'success' => true,
+            'data' => $stats
+        ]);
     }
 }

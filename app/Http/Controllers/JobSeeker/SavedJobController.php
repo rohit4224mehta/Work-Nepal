@@ -20,7 +20,9 @@ class SavedJobController extends Controller
             ->with(['company'])
             ->paginate(12);
 
-        return view('jobseeker.saved-jobs', compact('savedJobs'));
+        // ✅ FIXED: Use the correct view path
+        // Your file is at resources/views/dashboard/jobseeker/saved-jobs.blade.php
+        return view('dashboard.jobseeker.saved-jobs', compact('savedJobs'));
     }
 
     /**

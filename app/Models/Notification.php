@@ -9,7 +9,8 @@ class Notification extends Model
     protected $table = 'notifications';
     
     protected $fillable = [
-        'user_id', 'type', 'title', 'message', 'data', 'is_read', 'read_at'
+        'user_id', 'user_type', 'type', 'category', 'title', 'message',
+        'data', 'action_url', 'icon', 'color', 'is_read', 'read_at', 'priority'
     ];
     
     protected $casts = [
@@ -20,7 +21,7 @@ class Notification extends Model
     ];
     
     /**
-     * Get the user who owns the notification
+     * Get the user that owns the notification
      */
     public function user()
     {
@@ -39,6 +40,17 @@ class Notification extends Model
     }
     
     /**
+     * Mark notification as unread
+     */
+    public function markAsUnread()
+    {
+        $this->update([
+            'is_read' => false,
+            'read_at' => null,
+        ]);
+    }
+    
+    /**
      * Scope for unread notifications
      */
     public function scopeUnread($query)
@@ -47,69 +59,18 @@ class Notification extends Model
     }
     
     /**
-     * Get action URL based on notification type
+     * Scope by category
      */
-    public function getActionUrl()
+    public function scopeCategory($query, $category)
     {
-        $data = $this->data;
-        
-        switch ($this->type) {
-            case 'job_applied':
-            case 'application_viewed':
-            case 'application_shortlisted':
-            case 'application_rejected':
-            case 'application_hired':
-                return isset($data['job_id']) ? route('jobs.show', $data['job_id']) : '#';
-                
-            case 'new_application':
-                return isset($data['application_id']) 
-                    ? route('employer.applicants.show', $data['application_id']) 
-                    : '#';
-                
-            case 'company_verified':
-                return route('employer.dashboard');
-                
-            case 'job_expired':
-                return route('employer.jobs.index');
-                
-            default:
-                return '#';
-        }
+        return $query->where('category', $category);
     }
     
     /**
-     * Get icon based on notification type
+     * Scope by priority
      */
-    public function getIcon()
+    public function scopePriority($query, $priority)
     {
-        return match($this->type) {
-            'job_applied' => '📝',
-            'application_viewed' => '👀',
-            'application_shortlisted' => '⭐',
-            'application_rejected' => '❌',
-            'application_hired' => '🎉',
-            'new_application' => '📩',
-            'company_verified' => '✅',
-            'job_expired' => '⚠️',
-            default => '🔔',
-        };
-    }
-    
-    /**
-     * Get color based on notification type
-     */
-    public function getColor()
-    {
-        return match($this->type) {
-            'job_applied' => 'blue',
-            'application_viewed' => 'purple',
-            'application_shortlisted' => 'green',
-            'application_rejected' => 'red',
-            'application_hired' => 'emerald',
-            'new_application' => 'orange',
-            'company_verified' => 'teal',
-            'job_expired' => 'yellow',
-            default => 'gray',
-        };
+        return $query->where('priority', $priority);
     }
 }

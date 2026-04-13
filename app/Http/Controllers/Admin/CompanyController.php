@@ -7,14 +7,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
-class CompanyController extends AdminController
+class CompanyController extends Controller
 {
     /**
      * Display a listing of companies.
@@ -252,7 +254,7 @@ class CompanyController extends AdminController
     }
 
     /**
-     * Verify company.
+     * Verify company with notification.
      */
     public function verify(Company $company): RedirectResponse
     {
@@ -263,30 +265,35 @@ class CompanyController extends AdminController
         DB::beginTransaction();
 
         try {
+            $oldStatus = $company->verification_status;
             $company->update(['verification_status' => 'verified']);
 
-            // Log activity
-            $this->logAdminAction(
-                'company_verified',
-                "Verified company: {$company->name} (ID: {$company->id})",
-                $company
-            );
+            // ✅ NOTIFICATION: Send notification to company owner
+            NotificationService::companyVerified($company, $company->owner_id);
 
-            // Send notification to company owner
-            // $company->owner->notify(new CompanyVerifiedNotification($company));
+            // Log activity
+            Log::info('Company verified', [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'admin_id' => auth()->id(),
+                'old_status' => $oldStatus,
+                'new_status' => 'verified'
+            ]);
 
             DB::commit();
 
             return redirect()->route('admin.companies.show', $company)
-                ->with('success', 'Company verified successfully.');
+                ->with('success', 'Company verified successfully. Owner has been notified.');
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Failed to verify company: ' . $e->getMessage());
             return back()->with('error', 'Failed to verify company. Please try again.');
         }
     }
 
     /**
-     * Reject company verification.
+     * Reject company verification with notification.
      */
     public function reject(Request $request, Company $company): RedirectResponse
     {
@@ -297,27 +304,43 @@ class CompanyController extends AdminController
         DB::beginTransaction();
 
         try {
+            $oldStatus = $company->verification_status;
             $company->update([
                 'verification_status' => 'rejected',
                 'rejection_reason' => $request->rejection_reason,
             ]);
 
-            // Log activity
-            $this->logAdminAction(
+            // ✅ NOTIFICATION: Send rejection notification to company owner
+            NotificationService::send(
+                $company->owner_id,
                 'company_rejected',
-                "Rejected company: {$company->name} (ID: {$company->id})",
-                $company
+                'Company Application Update',
+                "Your company \"{$company->name}\" verification request has been reviewed. Reason: " . $request->rejection_reason,
+                [
+                    'company_id' => $company->id,
+                    'company_name' => $company->name,
+                    'reason' => $request->rejection_reason,
+                ]
             );
 
-            // Send notification to company owner
-            // $company->owner->notify(new CompanyRejectedNotification($company, $request->rejection_reason));
+            // Log activity
+            Log::info('Company rejected', [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'admin_id' => auth()->id(),
+                'reason' => $request->rejection_reason,
+                'old_status' => $oldStatus,
+                'new_status' => 'rejected'
+            ]);
 
             DB::commit();
 
             return redirect()->route('admin.companies.index')
-                ->with('success', 'Company rejected successfully.');
+                ->with('success', 'Company rejected successfully. Owner has been notified.');
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Failed to reject company: ' . $e->getMessage());
             return back()->with('error', 'Failed to reject company. Please try again.');
         }
     }
@@ -330,24 +353,43 @@ class CompanyController extends AdminController
         DB::beginTransaction();
 
         try {
+            $oldStatus = $company->verification_status;
             $company->update(['verification_status' => 'suspended']);
 
             // Also suspend all active jobs
-            JobPosting::where('company_id', $company->id)
+            $suspendedJobs = JobPosting::where('company_id', $company->id)
                 ->where('status', 'active')
                 ->update(['status' => 'suspended']);
 
-            $this->logAdminAction(
+            // ✅ NOTIFICATION: Send suspension notification to company owner
+            NotificationService::send(
+                $company->owner_id,
                 'company_suspended',
-                "Suspended company: {$company->name} (ID: {$company->id})",
-                $company
+                'Important: Your Company Has Been Suspended',
+                "Your company \"{$company->name}\" has been suspended. Please contact support for more information.",
+                [
+                    'company_id' => $company->id,
+                    'company_name' => $company->name,
+                    'jobs_suspended' => $suspendedJobs,
+                ]
             );
+
+            Log::info('Company suspended', [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'admin_id' => auth()->id(),
+                'old_status' => $oldStatus,
+                'new_status' => 'suspended',
+                'jobs_suspended' => $suspendedJobs
+            ]);
 
             DB::commit();
 
-            return back()->with('success', 'Company suspended successfully.');
+            return back()->with('success', 'Company suspended successfully. Owner has been notified.');
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Failed to suspend company: ' . $e->getMessage());
             return back()->with('error', 'Failed to suspend company. Please try again.');
         }
     }
@@ -360,24 +402,43 @@ class CompanyController extends AdminController
         DB::beginTransaction();
 
         try {
+            $oldStatus = $company->verification_status;
             $company->update(['verification_status' => 'verified']);
 
             // Reactivate jobs (optional)
-            JobPosting::where('company_id', $company->id)
+            $activatedJobs = JobPosting::where('company_id', $company->id)
                 ->where('status', 'suspended')
                 ->update(['status' => 'active']);
 
-            $this->logAdminAction(
+            // ✅ NOTIFICATION: Send activation notification to company owner
+            NotificationService::send(
+                $company->owner_id,
                 'company_activated',
-                "Activated company: {$company->name} (ID: {$company->id})",
-                $company
+                'Great News! Your Company Has Been Activated',
+                "Your company \"{$company->name}\" has been reactivated. You can now post jobs again.",
+                [
+                    'company_id' => $company->id,
+                    'company_name' => $company->name,
+                    'jobs_activated' => $activatedJobs,
+                ]
             );
+
+            Log::info('Company activated', [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'admin_id' => auth()->id(),
+                'old_status' => $oldStatus,
+                'new_status' => 'verified',
+                'jobs_activated' => $activatedJobs
+            ]);
 
             DB::commit();
 
-            return back()->with('success', 'Company activated successfully.');
+            return back()->with('success', 'Company activated successfully. Owner has been notified.');
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Failed to activate company: ' . $e->getMessage());
             return back()->with('error', 'Failed to activate company. Please try again.');
         }
     }
@@ -392,6 +453,7 @@ class CompanyController extends AdminController
         try {
             $companyName = $company->name;
             $companyId = $company->id;
+            $ownerId = $company->owner_id;
 
             // Delete logo if exists
             if ($company->logo_path) {
@@ -420,17 +482,21 @@ class CompanyController extends AdminController
 
             $company->delete();
 
-            $this->logAdminAction(
-                'company_deleted',
-                "Deleted company: {$companyName} (ID: {$companyId})"
-            );
+            Log::info('Company deleted', [
+                'company_id' => $companyId,
+                'company_name' => $companyName,
+                'admin_id' => auth()->id(),
+                'owner_id' => $ownerId
+            ]);
 
             DB::commit();
 
             return redirect()->route('admin.companies.index')
                 ->with('success', 'Company deleted successfully.');
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Failed to delete company: ' . $e->getMessage());
             return back()->with('error', 'Failed to delete company. Please try again.');
         }
     }
@@ -453,27 +519,71 @@ class CompanyController extends AdminController
 
         try {
             $companies = Company::whereIn('id', $companyIds)->get();
+            $processedCount = 0;
+            $notificationCount = 0;
 
             foreach ($companies as $company) {
                 switch ($action) {
                     case 'verify':
-                        $company->update(['verification_status' => 'verified']);
+                        if ($company->verification_status !== 'verified') {
+                            $company->update(['verification_status' => 'verified']);
+                            NotificationService::companyVerified($company, $company->owner_id);
+                            $notificationCount++;
+                            $processedCount++;
+                        }
                         break;
+
                     case 'reject':
-                        $company->update(['verification_status' => 'rejected']);
+                        if ($company->verification_status !== 'rejected') {
+                            $company->update(['verification_status' => 'rejected']);
+                            NotificationService::send(
+                                $company->owner_id,
+                                'company_rejected',
+                                'Company Application Update',
+                                "Your company \"{$company->name}\" verification request has been reviewed and was not approved.",
+                                ['company_id' => $company->id, 'company_name' => $company->name]
+                            );
+                            $notificationCount++;
+                            $processedCount++;
+                        }
                         break;
+
                     case 'suspend':
-                        $company->update(['verification_status' => 'suspended']);
-                        JobPosting::where('company_id', $company->id)
-                            ->where('status', 'active')
-                            ->update(['status' => 'suspended']);
+                        if ($company->verification_status !== 'suspended') {
+                            $company->update(['verification_status' => 'suspended']);
+                            JobPosting::where('company_id', $company->id)
+                                ->where('status', 'active')
+                                ->update(['status' => 'suspended']);
+                            NotificationService::send(
+                                $company->owner_id,
+                                'company_suspended',
+                                'Company Suspended',
+                                "Your company \"{$company->name}\" has been suspended.",
+                                ['company_id' => $company->id, 'company_name' => $company->name]
+                            );
+                            $notificationCount++;
+                            $processedCount++;
+                        }
                         break;
+
                     case 'activate':
-                        $company->update(['verification_status' => 'verified']);
-                        JobPosting::where('company_id', $company->id)
-                            ->where('status', 'suspended')
-                            ->update(['status' => 'active']);
+                        if ($company->verification_status !== 'verified') {
+                            $company->update(['verification_status' => 'verified']);
+                            JobPosting::where('company_id', $company->id)
+                                ->where('status', 'suspended')
+                                ->update(['status' => 'active']);
+                            NotificationService::send(
+                                $company->owner_id,
+                                'company_activated',
+                                'Company Activated',
+                                "Your company \"{$company->name}\" has been reactivated.",
+                                ['company_id' => $company->id, 'company_name' => $company->name]
+                            );
+                            $notificationCount++;
+                            $processedCount++;
+                        }
                         break;
+
                     case 'delete':
                         // Delete files
                         if ($company->logo_path) {
@@ -483,21 +593,29 @@ class CompanyController extends AdminController
                             Storage::disk('public')->delete($company->cover_path);
                         }
                         $company->delete();
+                        $processedCount++;
                         break;
                 }
             }
 
-            $this->logAdminAction(
-                "bulk_companies_{$action}",
-                "Bulk {$action} on " . count($companyIds) . " companies"
-            );
+            Log::info('Bulk action on companies', [
+                'action' => $action,
+                'companies_processed' => $processedCount,
+                'notifications_sent' => $notificationCount,
+                'admin_id' => auth()->id()
+            ]);
 
             DB::commit();
 
-            $message = count($companyIds) . ' companies processed successfully.';
+            $message = $processedCount . ' companies processed successfully.';
+            if ($notificationCount > 0) {
+                $message .= ' ' . $notificationCount . ' notifications sent.';
+            }
             return back()->with('success', $message);
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Bulk action failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to process bulk action. Please try again.');
         }
     }
@@ -527,34 +645,19 @@ class CompanyController extends AdminController
 
         $companies = $query->get();
 
-        // Generate CSV
         $filename = 'companies_export_' . date('Y-m-d_His') . '.csv';
         $handle = fopen('php://memory', 'r+');
 
         // Add UTF-8 BOM for Excel
         fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
 
-        // Add headers
         fputcsv($handle, [
-            'ID',
-            'Company Name',
-            'Owner',
-            'Owner Email',
-            'Industry',
-            'Location',
-            'Size',
-            'Founded Year',
-            'Verification Status',
-            'Total Jobs',
-            'Active Jobs',
-            'Website',
-            'Contact Email',
-            'Phone',
-            'Created At',
-            'Last Updated'
+            'ID', 'Company Name', 'Owner', 'Owner Email', 'Industry',
+            'Location', 'Size', 'Founded Year', 'Verification Status',
+            'Total Jobs', 'Active Jobs', 'Website', 'Contact Email',
+            'Phone', 'Created At', 'Last Updated'
         ]);
 
-        // Add data
         foreach ($companies as $company) {
             fputcsv($handle, [
                 $company->id,
@@ -594,7 +697,6 @@ class CompanyController extends AdminController
     {
         $company->load(['owner', 'jobPostings.applications']);
 
-        // Job posting trends
         $jobTrends = $company->jobPostings()
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
             ->where('created_at', '>=', now()->subMonths(6))
@@ -602,7 +704,6 @@ class CompanyController extends AdminController
             ->orderBy('date')
             ->get();
 
-        // Application trends
         $applicationTrends = DB::table('job_applications')
             ->join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
             ->where('job_postings.company_id', $company->id)
@@ -612,7 +713,6 @@ class CompanyController extends AdminController
             ->orderBy('date')
             ->get();
 
-        // Top job categories
         $topCategories = $company->jobPostings()
             ->select('category', DB::raw('count(*) as count'))
             ->whereNotNull('category')

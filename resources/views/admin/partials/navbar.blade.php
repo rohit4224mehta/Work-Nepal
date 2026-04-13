@@ -1,9 +1,64 @@
 {{-- resources/views/admin/partials/navbar.blade.php --}}
 @php
     use Illuminate\Support\Facades\Route;
+    use App\Services\NotificationService;
 @endphp
 
-<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700" x-data="{ profileOpen: false, notificationsOpen: false, searchOpen: false }">
+<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40" 
+     x-data="{ 
+        profileOpen: false, 
+        notificationsOpen: false, 
+        searchOpen: false,
+        unreadCount: {{ $unreadCount ?? 0 }},
+        notifications: @json($recentNotifications ?? []),
+        fetchNotifications() {
+            fetch('{{ route("admin.notifications.recent") }}')
+                .then(response => response.json())
+                .then(data => {
+                    this.notifications = data.notifications;
+                    this.unreadCount = data.unread_count;
+                })
+                .catch(error => console.error('Error fetching notifications:', error));
+        },
+        markAsRead(notificationId) {
+            fetch(`{{ route("admin.notifications.read", '') }}/${notificationId}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.fetchNotifications();
+                }
+            })
+            .catch(error => console.error('Error marking notification as read:', error));
+        },
+        markAllAsRead() {
+            fetch('{{ route("admin.notifications.mark-all-read") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.fetchNotifications();
+                }
+            })
+            .catch(error => console.error('Error marking all as read:', error));
+        }
+     }" 
+     x-init="
+        @auth
+            fetchNotifications();
+            setInterval(() => fetchNotifications(), 30000);
+        @endauth
+     ">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">
             {{-- Left side - Mobile menu button --}}
@@ -30,41 +85,8 @@
 
             {{-- Right side - Notifications, Search & Profile --}}
             <div class="flex items-center gap-x-3 lg:gap-x-5">
-                {{-- Search (expandable) --}}
-                <div class="relative" x-data="{ expanded: false }">
-                    <div class="flex items-center">
-                        <div x-show="!expanded" class="lg:hidden">
-                            <button @click="expanded = true" class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div x-show="expanded" 
-                             x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0 scale-95"
-                             x-transition:enter-end="opacity-100 scale-100"
-                             x-transition:leave="transition ease-in duration-150"
-                             x-transition:leave-start="opacity-100 scale-100"
-                             x-transition:leave-end="opacity-0 scale-95"
-                             class="absolute right-0 top-0 w-64 lg:relative lg:w-auto lg:block" 
-                             @click.away="expanded = false">
-                            <div class="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                <input type="text" 
-                                       placeholder="Search..." 
-                                       class="w-full py-2 px-3 bg-transparent text-gray-700 dark:text-gray-300 focus:outline-none text-sm">
-                                <button @click="expanded = false" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 lg:hidden">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                
+                
 
                 {{-- Quick Actions (for super admin) --}}
                 @if(auth()->user()->isSuperAdmin() && Route::has('admin.settings.index'))
@@ -87,14 +109,11 @@
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                         </svg>
-                        @php
-                            $unreadNotifications = auth()->user()->unreadNotifications->count();
-                        @endphp
-                        @if($unreadNotifications > 0)
-                            <span class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse">
-                                {{ $unreadNotifications > 9 ? '9+' : $unreadNotifications }}
-                            </span>
-                        @endif
+                        <span x-show="unreadCount > 0" 
+                              x-text="unreadCount > 9 ? '9+' : unreadCount"
+                              class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse"
+                              style="display: none;">
+                        </span>
                     </button>
 
                     {{-- Notifications Panel --}}
@@ -105,30 +124,50 @@
                          x-transition:leave="transition ease-in duration-150"
                          x-transition:leave-start="opacity-100 translate-y-0"
                          x-transition:leave-end="opacity-0 -translate-y-2"
-                         class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+                         class="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
                          style="display: none;">
+                        
                         <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                            @if($unreadNotifications > 0 && Route::has('admin.notifications.read-all'))
-                                <button class="text-xs text-red-600 hover:text-red-700">Mark all read</button>
-                            @endif
+                            <button x-show="unreadCount > 0" 
+                                    @click="markAllAsRead()"
+                                    class="text-xs text-red-600 hover:text-red-700 font-medium">
+                                Mark all as read
+                            </button>
                         </div>
+                        
                         <div class="max-h-96 overflow-y-auto">
-                            @forelse(auth()->user()->notifications->take(5) as $notification)
-                                <a href="{{ $notification->data['url'] ?? '#' }}" class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ is_null($notification->read_at) ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
-                                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $notification->data['title'] ?? 'Notification' }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $notification->data['message'] ?? '' }}</p>
-                                    <p class="text-xs text-gray-400 mt-1">{{ $notification->created_at->diffForHumans() }}</p>
-                                </a>
-                            @empty
+                            <template x-if="notifications.length === 0">
                                 <div class="px-4 py-8 text-center">
                                     <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                     </svg>
                                     <p class="text-gray-500 dark:text-gray-400">No notifications</p>
                                 </div>
-                            @endforelse
+                            </template>
+                            
+                            <template x-for="notification in notifications" :key="notification.id">
+                                <a :href="notification.action_url" 
+                                   @click="markAsRead(notification.id)"
+                                   class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                                   :class="{'bg-blue-50 dark:bg-blue-900/10': !notification.is_read}">
+                                    <div class="flex items-start gap-3">
+                                        <div class="flex-shrink-0">
+                                            <span class="text-xl" x-text="notification.icon"></span>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="notification.title"></p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="notification.message"></p>
+                                            <p class="text-xs text-gray-400 mt-1" x-text="notification.created_at"></p>
+                                        </div>
+                                        <div x-show="!notification.is_read" class="flex-shrink-0">
+                                            <span class="w-2 h-2 bg-red-600 rounded-full inline-block"></span>
+                                        </div>
+                                    </div>
+                                </a>
+                            </template>
                         </div>
+                        
                         @if(Route::has('admin.notifications.index'))
                         <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
                             <a href="{{ route('admin.notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 font-medium">
@@ -165,7 +204,7 @@
                          x-transition:leave="transition ease-in duration-150"
                          x-transition:leave-start="opacity-100 translate-y-0"
                          x-transition:leave-end="opacity-0 -translate-y-2"
-                         class="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+                         class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
                          style="display: none;">
                         <div class="py-1">
                             {{-- User Info Header --}}
@@ -189,36 +228,36 @@
                             </div>
 
                             {{-- Menu Items with fallbacks --}}
-                            {{-- Menu Items with fallbacks --}}
-@php
-    $profileShowRoute = Route::has('admin.profile.show') ? route('admin.profile.show') : route('profile.show', auth()->user());
-    $profileEditRoute = Route::has('admin.profile.edit') ? route('admin.profile.edit') : route('profile.edit');
-    $profilePasswordRoute = Route::has('admin.profile.password') ? route('admin.profile.password') : route('profile.password');
-@endphp
+                            @php
+                                $profileShowRoute = Route::has('admin.profile.show') ? route('admin.profile.show') : route('profile.show', auth()->user());
+                                $profileEditRoute = Route::has('admin.profile.edit') ? route('admin.profile.edit') : route('profile.edit');
+                                $profilePasswordRoute = Route::has('admin.profile.password') ? route('admin.profile.password') : route('profile.password');
+                            @endphp
 
-<a href="{{ $profileShowRoute }}" 
-   class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-    My Profile
-</a>
+                            <a href="{{ $profileShowRoute }}" 
+                               class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                My Profile
+                            </a>
 
-<a href="{{ $profileEditRoute }}" 
-   class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-    Edit Profile
-</a>
+                            <a href="{{ $profileEditRoute }}" 
+                               class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit Profile
+                            </a>
 
-<a href="{{ $profilePasswordRoute }}" 
-   class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-    </svg>
-    Change Password
-</a>
+                            <a href="{{ $profilePasswordRoute }}" 
+                               class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Change Password
+                            </a>
+                            
                             <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
 
                             @if(Route::has('admin.settings.index'))

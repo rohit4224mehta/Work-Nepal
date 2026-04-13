@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/NotificationController.php
 
 namespace App\Http\Controllers;
 
@@ -9,17 +10,15 @@ use Illuminate\View\View;
 
 class NotificationController extends Controller
 {
-    /**
-     * Display all notifications for the authenticated user
-     */
     public function index(Request $request): View
     {
-        $user = auth()->user();
+        $query = auth()->user()->notifications();
         
-        $query = $user->notifications();
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
         
-        // Filter by read/unread
-        if ($request->has('filter')) {
+        if ($request->filled('filter')) {
             if ($request->filter === 'unread') {
                 $query->where('is_read', false);
             } elseif ($request->filter === 'read') {
@@ -27,53 +26,83 @@ class NotificationController extends Controller
             }
         }
         
-        $notifications = $query->paginate(20);
+        $notifications = $query->orderBy('created_at', 'desc')->paginate(20);
         
-        return view('notifications.index', compact('notifications'));
+        $stats = [
+            'total' => auth()->user()->notifications()->count(),
+            'unread' => auth()->user()->notifications()->where('is_read', false)->count(),
+            'application' => auth()->user()->notifications()->where('category', 'application')->count(),
+            'job' => auth()->user()->notifications()->where('category', 'job')->count(),
+            'company' => auth()->user()->notifications()->where('category', 'company')->count(),
+            'system' => auth()->user()->notifications()->where('category', 'system')->count(),
+        ];
+        
+        return view('notifications.index', compact('notifications', 'stats'));
     }
     
-    /**
-     * Mark a single notification as read
-     */
+    // In NotificationController.php
+
+public function getRecent()
+{
+    $notifications = auth()->user()
+        ->notifications()
+        ->orderBy('created_at', 'desc')
+        ->limit(10)
+        ->get()
+        ->map(function($notification) {
+            return [
+                'id' => $notification->id,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'type' => $notification->type,
+                'is_read' => (bool) $notification->is_read,
+                'time_ago' => $notification->created_at->diffForHumans(),
+                'action_url' => $notification->action_url ?? '#',
+                'icon' => $notification->icon ?? $this->getIconForType($notification->type),
+                'color' => $notification->color ?? 'gray',
+            ];
+        });
+    
+    return response()->json([
+        'notifications' => $notifications,
+        'unread_count' => auth()->user()->notifications()->where('is_read', false)->count(),
+    ]);
+}
+
+protected function getIconForType($type)
+{
+    $icons = [
+        'job_applied' => '📝',
+        'job_shortlisted' => '⭐',
+        'job_rejected' => '❌',
+        'job_hired' => '🎉',
+        'new_application' => '📩',
+        'job_approved' => '✅',
+        'company_verified' => '🏢',
+        'new_job_pending' => '📄',
+        'new_company_pending' => '🏢',
+        'new_report' => '🚩',
+    ];
+    
+    return $icons[$type] ?? '🔔';
+}
+    
     public function markAsRead(Notification $notification)
     {
-        // Check if notification belongs to the authenticated user
         if ($notification->user_id !== auth()->id()) {
             abort(403);
         }
         
-        $notification->markAsRead();
-        
-        if (request()->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Notification marked as read'
-            ]);
-        }
-        
-        return back()->with('success', 'Notification marked as read');
+        $notification->update(['is_read' => true, 'read_at' => now()]);
+        return response()->json(['success' => true]);
     }
     
-    /**
-     * Mark all notifications as read
-     */
     public function markAllAsRead()
     {
         NotificationService::markAllAsRead(auth()->id());
-        
-        if (request()->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'All notifications marked as read'
-            ]);
-        }
-        
-        return back()->with('success', 'All notifications marked as read');
+        return response()->json(['success' => true]);
     }
     
-    /**
-     * Delete a notification
-     */
     public function destroy(Notification $notification)
     {
         if ($notification->user_id !== auth()->id()) {
@@ -81,58 +110,21 @@ class NotificationController extends Controller
         }
         
         $notification->delete();
-        
-        if (request()->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Notification deleted'
-            ]);
-        }
-        
-        return back()->with('success', 'Notification deleted');
+        return response()->json(['success' => true]);
+    }
+
+    /**
+ * Clear all notifications for the user
+ */
+public function clearAll()
+{
+    auth()->user()->notifications()->delete();
+    
+    if (request()->ajax()) {
+        return response()->json(['success' => true, 'message' => 'All notifications cleared']);
     }
     
-    /**
-     * Get unread count for AJAX polling
-     */
-    public function getUnreadCount()
-    {
-        $count = NotificationService::getUnreadCount(auth()->id());
-        
-        return response()->json([
-            'count' => $count
-        ]);
-    }
-    
-    /**
-     * Get recent notifications for dropdown (AJAX)
-     */
-    public function getRecent()
-    {
-        $notifications = auth()->user()
-            ->notifications()
-            ->limit(10)
-            ->get()
-            ->map(function($notification) {
-                return [
-                    'id' => $notification->id,
-                    'title' => $notification->title,
-                    'message' => $notification->message,
-                    'type' => $notification->type,
-                    'is_read' => $notification->is_read,
-                    'created_at' => $notification->created_at->diffForHumans(),
-                    'action_url' => $notification->getActionUrl(),
-                    'icon' => $notification->getIcon(),
-                    'color' => $notification->getColor(),
-                ];
-            });
-        
-        $unreadCount = NotificationService::getUnreadCount(auth()->id());
-        
-        return response()->json([
-            'notifications' => $notifications,
-            'unread_count' => $unreadCount,
-            'total' => $notifications->count()
-        ]);
-    }
+    return redirect()->route('notifications.index')
+        ->with('success', 'All notifications cleared');
+}
 }

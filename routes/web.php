@@ -33,8 +33,9 @@ use App\Http\Controllers\Admin\ContentController as AdminContentController;
 use App\Http\Controllers\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 
-// Notification Controller
+// Notification Controllers
 use App\Http\Controllers\NotificationController;
 
 /*
@@ -55,8 +56,7 @@ use App\Http\Controllers\NotificationController;
 // Home Page
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
-// In routes/web.php
-
+// Jobs Routes
 Route::prefix('jobs')->name('jobs.')->group(function () {
     
     // Public routes
@@ -69,19 +69,17 @@ Route::prefix('jobs')->name('jobs.')->group(function () {
     
     // Protected routes with rate limiting
     Route::middleware(['auth', 'verified'])->group(function () {
-        // ✅ FIX: Use slug for apply route
         Route::post('/{job:slug}/apply', [JobController::class, 'apply'])
             ->name('apply')
             ->middleware('throttle:10,1');
         
-        // ✅ FIX: Use slug for toggle-save route
         Route::post('/{job:slug}/toggle-save', [JobController::class, 'toggleSave'])
             ->name('toggle-save')
             ->middleware('throttle:20,1');
     });
 });
 
-// Companies (public profiles)
+// Companies Routes
 Route::prefix('companies')->name('companies.')->group(function () {
     Route::get('/', [CompaniesController::class, 'index'])->name('index');
     Route::get('/search/suggestions', [CompaniesController::class, 'suggestions'])->name('suggestions');
@@ -212,10 +210,9 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
             Route::get('/{company}/success', [EmployerCompanyController::class, 'success'])->name('success');
             Route::get('/{company}/preview', [EmployerCompanyController::class, 'preview'])->name('preview');
             
-            // ========== EDIT COMPANY ROUTES (FIXED - Now outside role middleware) ==========
+            // Edit Company Routes
             Route::get('/{company}/edit', [EmployerCompanyController::class, 'edit'])->name('edit');
             Route::put('/{company}', [EmployerCompanyController::class, 'update'])->name('update');
-            // ==============================================================================
             
             // Team Management Routes
             Route::get('/{company}/team', [EmployerCompanyController::class, 'team'])->name('team');
@@ -229,7 +226,7 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
         Route::get('/post-job', fn() => redirect()->route('employer.jobs.create'))->name('post.job');
         Route::get('/applicants', fn() => redirect()->route('employer.applicants.index'))->name('applicants');
 
-        // ========== EMPLOYER DASHBOARD (Role-based) ==========
+        // ========== EMPLOYER DASHBOARD ==========
         Route::get('/dashboard', [EmployerDashboardController::class, 'index'])->name('dashboard');
         
         // ========== EMPLOYER-ONLY ROUTES ==========
@@ -244,6 +241,16 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
             Route::get('/applicants/{application}', [EmployerApplicantController::class, 'show'])->name('applicants.show');
             Route::patch('/applicants/{application}/status', [EmployerApplicantController::class, 'updateStatus'])->name('applicants.status');
         });
+    });
+    
+    // ==================== USER NOTIFICATION ROUTES ====================
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
+        Route::get('/recent', [NotificationController::class, 'getRecent'])->name('recent');
     });
 
     // ==================== 6. ADMIN ROUTES ====================
@@ -383,11 +390,14 @@ Route::middleware(['auth', 'verified', 'account.active'])->group(function () {
             Route::get('/{log}', [AdminActivityLogController::class, 'show'])->name('show');
         });
         
-        // Notifications
-        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-        Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
-        Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
-
+        // ==================== ADMIN NOTIFICATION ROUTES ====================
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/', [AdminNotificationController::class, 'index'])->name('index');
+            Route::post('/recent', [AdminNotificationController::class, 'getRecent'])->name('recent');
+            Route::post('/{notification}/read', [AdminNotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/mark-all-read', [AdminNotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        });
+        
         // ==================== ADMIN PROFILE ROUTES ====================
         Route::prefix('profile')->name('profile.')->group(function () {
             Route::get('/', [AdminProfileController::class, 'show'])->name('show');

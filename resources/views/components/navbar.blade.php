@@ -84,76 +84,108 @@
                         @endrole
 
                         <!-- Notifications Bell (Visible to all authenticated users) -->
-                        <div class="relative" @click.away="notificationsOpen = false">
-                            <button @click="notificationsOpen = !notificationsOpen" 
-                                    class="relative text-gray-700 dark:text-gray-300 hover:text-red-600 transition-colors focus:outline-none p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                                <span class="sr-only">View notifications</span>
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                                </svg>
-                                @php
-                                    try {
-                                        $unreadCount = auth()->user()->unreadNotifications()->count();
-                                    } catch (\Exception $e) {
-                                        $unreadCount = 0;
-                                    }
-                                @endphp
-                                @if($unreadCount > 0)
-                                    <span class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse">
-                                        {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-                                    </span>
-                                @endif
-                            </button>
+<div class="relative" x-data="notificationComponent()" x-init="init()">
+    <button @click="toggleDropdown()" 
+            class="relative text-gray-700 dark:text-gray-300 hover:text-red-600 transition-colors focus:outline-none p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+        <span class="sr-only">View notifications</span>
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+        </svg>
+        
+        <!-- Dynamic Unread Badge -->
+        <span x-show="unreadCount > 0" 
+              x-text="unreadCount > 99 ? '99+' : unreadCount"
+              class="absolute top-1 right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full"
+              style="display: none;">
+        </span>
+    </button>
 
-                            <!-- Notifications Dropdown -->
-                            <div x-show="notificationsOpen" 
-                                 x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="opacity-0 -translate-y-2"
-                                 x-transition:enter-end="opacity-100 translate-y-0"
-                                 x-transition:leave="transition ease-in duration-150"
-                                 x-transition:leave-start="opacity-100 translate-y-0"
-                                 x-transition:leave-end="opacity-0 -translate-y-2"
-                                 class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
-                                 style="display: none;">
-                                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                                    @if($unreadCount > 0)
-                                        <button class="text-xs text-red-600 hover:text-red-700">Mark all read</button>
-                                    @endif
-                                </div>
-                                <div class="max-h-96 overflow-y-auto">
-                                    @php
-                                        try {
-                                            $notifications = auth()->user()->notifications()->take(5)->get();
-                                        } catch (\Exception $e) {
-                                            $notifications = collect([]);
-                                        }
-                                    @endphp
-                                    
-                                    @forelse($notifications as $notification)
-                                        <a href="{{ $notification->data['url'] ?? '#' }}" class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition {{ is_null($notification->read_at) ? 'bg-blue-50 dark:bg-blue-900/10' : '' }}">
-                                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $notification->data['title'] ?? 'Notification' }}</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $notification->data['message'] ?? '' }}</p>
-                                            <p class="text-xs text-gray-400 mt-1">{{ $notification->created_at->diffForHumans() }}</p>
-                                        </a>
-                                    @empty
-                                        <div class="px-4 py-8 text-center">
-                                            <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                            </svg>
-                                            <p class="text-gray-500 dark:text-gray-400">No notifications</p>
-                                        </div>
-                                    @endforelse
-                                </div>
-                                @if(Route::has('notifications.index'))
-                                    <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
-                                        <a href="{{ route('notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 font-medium">
-                                            View all notifications
-                                        </a>
-                                    </div>
-                                @endif
-                            </div>
+    <!-- Notifications Dropdown - Fully Dynamic -->
+    <div x-show="isOpen" 
+         @click.away="closeDropdown()"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50"
+         style="display: none;">
+        
+        <!-- Header -->
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" x-show="unreadCount > 0">
+                    <span x-text="unreadCount"></span> unread
+                </p>
+            </div>
+            <button x-show="unreadCount > 0" 
+                    @click="markAllAsRead()"
+                    class="text-xs text-red-600 hover:text-red-700 font-medium transition">
+                Mark all read
+            </button>
+        </div>
+        
+        <!-- Notifications List -->
+        <div class="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+            <template x-for="notification in notifications" :key="notification.id">
+                <a :href="notification.action_url" 
+                   @click="markAsRead(notification.id)"
+                   class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                   :class="{'bg-blue-50 dark:bg-blue-900/10': !notification.is_read}">
+                    <div class="flex gap-3">
+                        <!-- Icon with Color -->
+                        <div class="flex-shrink-0">
+                            <span class="text-xl" x-text="notification.icon"></span>
                         </div>
+                        
+                        <!-- Content -->
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="notification.title"></p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="notification.message"></p>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1" x-text="notification.time_ago"></p>
+                        </div>
+                        
+                        <!-- Unread Indicator -->
+                        <div x-show="!notification.is_read" class="flex-shrink-0">
+                            <span class="inline-block w-2 h-2 bg-red-600 rounded-full"></span>
+                        </div>
+                    </div>
+                </a>
+            </template>
+            
+            <!-- Loading State -->
+            <div x-show="loading" class="px-4 py-8 text-center">
+                <svg class="w-8 h-8 mx-auto text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sm text-gray-500 mt-2">Loading...</p>
+            </div>
+            
+            <!-- Empty State -->
+            <div x-show="!loading && notifications.length === 0" class="px-4 py-8 text-center">
+                <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <p class="text-gray-500 dark:text-gray-400">No notifications yet</p>
+                <p class="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
+            <a href="{{ route('notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 font-medium transition">
+                View all notifications
+                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+        </div>
+    </div>
+</div>
+
 
                         <!-- Profile Dropdown with Alpine.js -->
                         <div class="relative" @click.away="profileDropdownOpen = false">
@@ -562,3 +594,94 @@
 
 <!-- Add Alpine.js if not already included -->
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+function notificationComponent() {
+    return {
+        isOpen: false,
+        loading: false,
+        unreadCount: 0,
+        notifications: [],
+        pollingInterval: null,
+        
+        init() {
+            this.fetchNotifications();
+            // Poll every 30 seconds for new notifications
+            this.pollingInterval = setInterval(() => this.fetchNotifications(), 30000);
+        },
+        
+        toggleDropdown() {
+            this.isOpen = !this.isOpen;
+            if (this.isOpen) {
+                this.fetchNotifications();
+            }
+        },
+        
+        closeDropdown() {
+            this.isOpen = false;
+        },
+        
+        async fetchNotifications() {
+            this.loading = true;
+            try {
+                const response = await fetch('{{ route("notifications.recent") }}', {
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                this.notifications = data.notifications;
+                this.unreadCount = data.unread_count;
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async markAsRead(notificationId) {
+            try {
+                await fetch(`/notifications/${notificationId}/read`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                // Update local state
+                const notification = this.notifications.find(n => n.id === notificationId);
+                if (notification && !notification.is_read) {
+                    notification.is_read = true;
+                    this.unreadCount--;
+                }
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+            }
+        },
+        
+        async markAllAsRead() {
+            try {
+                await fetch('{{ route("notifications.mark-all-read") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                // Update local state
+                this.notifications.forEach(n => n.is_read = true);
+                this.unreadCount = 0;
+            } catch (error) {
+                console.error('Error marking all as read:', error);
+            }
+        },
+        
+        // Clean up interval when component is destroyed
+        destroy() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+            }
+        }
+    }
+}
+</script>

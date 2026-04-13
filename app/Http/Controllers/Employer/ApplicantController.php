@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Employer;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -58,7 +59,7 @@ class ApplicantController extends Controller
      */
     public function show(JobApplication $application)
     {
-        // ✅ FIXED: Use canAccessCompany instead of canManageCompany
+        // Check permission
         if (!auth()->user()->canAccessCompany($application->jobPosting->company)) {
             abort(403, 'You do not have permission to view this application.');
         }
@@ -69,11 +70,11 @@ class ApplicantController extends Controller
     }
 
     /**
-     * Update application status.
+     * Update application status with notifications.
      */
     public function updateStatus(Request $request, JobApplication $application)
     {
-        // ✅ FIXED: Use canAccessCompany instead of canManageCompany
+        // Check permission
         if (!auth()->user()->canAccessCompany($application->jobPosting->company)) {
             if ($request->ajax()) {
                 return response()->json([
@@ -90,10 +91,15 @@ class ApplicantController extends Controller
 
         try {
             $oldStatus = $application->status;
+            
+            // Update application status
             $application->update([
                 'status' => $request->status,
                 'status_updated_at' => now(),
             ]);
+
+            // ✅ NOTIFICATION: Send notification based on status change
+            $this->sendStatusNotification($application, $oldStatus, $request->status);
 
             // Log the activity
             Log::info('Application status updated', [
@@ -131,11 +137,44 @@ class ApplicantController extends Controller
     }
 
     /**
+     * Send notification based on status change.
+     */
+    protected function sendStatusNotification(JobApplication $application, $oldStatus, $newStatus)
+    {
+        // Only send notification when status actually changes
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        $applicantId = $application->user_id;
+        $job = $application->jobPosting;
+        $company = $job->company;
+
+        switch ($newStatus) {
+            case 'viewed':
+                NotificationService::applicationViewed($application);
+                break;
+                
+            case 'shortlisted':
+                NotificationService::applicationShortlisted($application);
+                break;
+                
+            case 'rejected':
+                NotificationService::applicationRejected($application);
+                break;
+                
+            case 'hired':
+                NotificationService::applicationHired($application);
+                break;
+        }
+    }
+
+    /**
      * Add feedback/notes to application.
      */
     public function addFeedback(Request $request, JobApplication $application)
     {
-        // ✅ FIXED: Use canAccessCompany instead of canManageCompany
+        // Check permission
         if (!auth()->user()->canAccessCompany($application->jobPosting->company)) {
             if ($request->ajax()) {
                 return response()->json([
@@ -188,7 +227,7 @@ class ApplicantController extends Controller
      */
     public function downloadResume(JobApplication $application)
     {
-        // ✅ FIXED: Use canAccessCompany instead of canManageCompany
+        // Check permission
         if (!auth()->user()->canAccessCompany($application->jobPosting->company)) {
             abort(403, 'You do not have permission to download this resume.');
         }
@@ -209,7 +248,7 @@ class ApplicantController extends Controller
     }
 
     /**
-     * Bulk update application statuses.
+     * Bulk update application statuses with notifications.
      */
     public function bulkUpdate(Request $request)
     {
@@ -222,6 +261,7 @@ class ApplicantController extends Controller
         $user = auth()->user();
         $updatedCount = 0;
         $failedCount = 0;
+        $notificationsSent = 0;
 
         foreach ($request->application_ids as $applicationId) {
             $application = JobApplication::find($applicationId);
@@ -238,11 +278,21 @@ class ApplicantController extends Controller
             }
 
             try {
+                $oldStatus = $application->status;
+                
                 $application->update([
                     'status' => $request->status,
                     'status_updated_at' => now(),
                 ]);
+                
                 $updatedCount++;
+                
+                // Send notification only if status changed
+                if ($oldStatus !== $request->status) {
+                    $this->sendStatusNotification($application, $oldStatus, $request->status);
+                    $notificationsSent++;
+                }
+                
             } catch (\Exception $e) {
                 $failedCount++;
                 Log::error('Bulk update failed for application: ' . $applicationId);
@@ -250,6 +300,9 @@ class ApplicantController extends Controller
         }
 
         $message = "Updated {$updatedCount} applications.";
+        if ($notificationsSent > 0) {
+            $message .= " Sent {$notificationsSent} notifications.";
+        }
         if ($failedCount > 0) {
             $message .= " {$failedCount} applications could not be updated.";
         }
@@ -259,7 +312,8 @@ class ApplicantController extends Controller
                 'success' => true,
                 'message' => $message,
                 'updated' => $updatedCount,
-                'failed' => $failedCount
+                'failed' => $failedCount,
+                'notifications_sent' => $notificationsSent
             ]);
         }
 
@@ -278,21 +332,44 @@ class ApplicantController extends Controller
         // Get companies the user has access to
         $companies = $user->accessibleCompanies()->pluck('id');
 
-        $applications = JobApplication::whereHas('jobPosting', function ($query) use ($companies) {
+        $query = JobApplication::whereHas('jobPosting', function ($query) use ($companies) {
             $query->whereIn('company_id', $companies);
         })
-        ->with(['applicant', 'jobPosting.company'])
-        ->latest()
-        ->get();
+        ->with(['applicant', 'jobPosting.company']);
+
+        // Apply status filter for export
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Apply date filter
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->date_from);
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        $applications = $query->latest()->get();
 
         $filename = 'applications_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
         $handle = fopen('php://temp', 'w+');
 
         // Add headers
         fputcsv($handle, [
-            'Application ID', 'Applicant Name', 'Applicant Email', 
-            'Job Title', 'Company', 'Status', 'Applied Date', 
-            'Status Updated', 'Feedback'
+            'Application ID', 
+            'Applicant Name', 
+            'Applicant Email',
+            'Applicant Phone',
+            'Job Title', 
+            'Company', 
+            'Job Type',
+            'Location',
+            'Status', 
+            'Applied Date', 
+            'Status Updated', 
+            'Feedback'
         ]);
 
         // Add data
@@ -301,8 +378,11 @@ class ApplicantController extends Controller
                 $application->id,
                 $application->applicant->name,
                 $application->applicant->email,
+                $application->applicant->mobile ?? 'N/A',
                 $application->jobPosting->title,
                 $application->jobPosting->company->name,
+                $application->jobPosting->job_type,
+                $application->jobPosting->location,
                 $application->status,
                 $application->created_at->format('Y-m-d H:i:s'),
                 $application->status_updated_at ? $application->status_updated_at->format('Y-m-d H:i:s') : '',
@@ -319,5 +399,113 @@ class ApplicantController extends Controller
                 'Content-Type' => 'text/csv',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]);
+    }
+
+    /**
+     * Get application statistics for dashboard.
+     */
+    public function getStats(Request $request)
+    {
+        $user = auth()->user();
+        $companies = $user->accessibleCompanies()->pluck('id');
+
+        $stats = [
+            'total' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->count(),
+            
+            'applied' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('status', 'applied')->count(),
+            
+            'viewed' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('status', 'viewed')->count(),
+            
+            'shortlisted' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('status', 'shortlisted')->count(),
+            
+            'rejected' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('status', 'rejected')->count(),
+            
+            'hired' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('status', 'hired')->count(),
+            
+            'this_week' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('created_at', '>=', now()->subWeek())->count(),
+            
+            'this_month' => JobApplication::whereHas('jobPosting', function ($q) use ($companies) {
+                $q->whereIn('company_id', $companies);
+            })->where('created_at', '>=', now()->startOfMonth())->count(),
+        ];
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Bulk delete applications.
+     */
+    public function bulkDelete(Request $request)
+    {
+        $request->validate([
+            'application_ids' => 'required|array',
+            'application_ids.*' => 'exists:job_applications,id',
+        ]);
+
+        $user = auth()->user();
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($request->application_ids as $applicationId) {
+            $application = JobApplication::find($applicationId);
+            
+            if (!$application) {
+                $failedCount++;
+                continue;
+            }
+
+            // Check permission for each application's company
+            if (!$user->canAccessCompany($application->jobPosting->company)) {
+                $failedCount++;
+                continue;
+            }
+
+            try {
+                $application->delete();
+                $deletedCount++;
+            } catch (\Exception $e) {
+                $failedCount++;
+                Log::error('Bulk delete failed for application: ' . $applicationId);
+            }
+        }
+
+        $message = "Deleted {$deletedCount} applications.";
+        if ($failedCount > 0) {
+            $message .= " {$failedCount} applications could not be deleted.";
+        }
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'deleted' => $deletedCount,
+                'failed' => $failedCount
+            ]);
+        }
+
+        return redirect()
+            ->route('employer.applicants.index')
+            ->with('success', $message);
     }
 }

@@ -6,11 +6,13 @@ namespace App\Http\Controllers\Employer;
 use App\Http\Controllers\Controller;
 use App\Models\JobPosting;
 use App\Models\Company;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class JobController extends Controller
 {
@@ -25,23 +27,20 @@ class JobController extends Controller
         $companyIds = $user->accessibleCompanyIds();
         
         if (empty($companyIds)) {
-            $jobs = collect(); // Return empty collection if no companies
+            $jobs = collect();
         } else {
             $query = JobPosting::whereIn('company_id', $companyIds)
                 ->with(['company', 'applications'])
                 ->withCount('applications');
             
-            // Apply status filter if provided
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
             }
             
-            // Apply verification filter if provided
             if ($request->filled('verification_status')) {
                 $query->where('verification_status', $request->verification_status);
             }
             
-            // Apply search filter
             if ($request->filled('search')) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
@@ -54,7 +53,6 @@ class JobController extends Controller
             $jobs = $query->latest()->paginate(10);
         }
         
-        // Get statistics for dashboard
         $stats = $this->getJobStatistics($companyIds);
         
         return view('employer.jobs.index', compact('jobs', 'stats'));
@@ -67,7 +65,6 @@ class JobController extends Controller
     {
         $user = auth()->user();
         
-        // Get companies the user has access to
         $companies = $user->accessibleCompanies()
             ->where('verification_status', 'verified')
             ->get();
@@ -77,7 +74,6 @@ class JobController extends Controller
                 ->with('error', 'You need a verified company to post jobs. Please create and verify your company first.');
         }
         
-        // Check if any company has reached job limit
         $maxJobs = config('settings.max_active_jobs_per_company', 20);
         $companiesWithLimit = [];
         
@@ -101,6 +97,7 @@ class JobController extends Controller
      */
     public function store(Request $request)
     {
+        // Validate the request
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'title' => 'required|string|max:255',
@@ -122,7 +119,8 @@ class JobController extends Controller
 
             // Check if user has access to this company
             if (!auth()->user()->canAccessCompany($company)) {
-                abort(403, 'You do not have permission to post jobs for this company.');
+                return back()->with('error', 'You do not have permission to post jobs for this company.')
+                    ->withInput();
             }
             
             // Check if company is verified
@@ -145,8 +143,8 @@ class JobController extends Controller
             // Create slug
             $slug = Str::slug($validated['title']) . '-' . Str::random(6);
             
-            // Create job posting
-            $job = JobPosting::create([
+            // Prepare job data
+            $jobData = [
                 'title' => $validated['title'],
                 'slug' => $slug,
                 'description' => $validated['description'],
@@ -161,39 +159,53 @@ class JobController extends Controller
                 'verification_status' => 'pending',
                 'is_featured' => false,
                 'job_source' => 'local',
-            ]);
+            ];
             
-            // Store skills if provided (if you have a skills table)
+            // Add benefits if provided
+            if ($request->filled('benefits')) {
+                $jobData['benefits'] = $request->benefits;
+            }
+            
+            // Create job posting
+            $job = JobPosting::create($jobData);
+            
+            // Handle skills if provided
             if ($request->filled('skills')) {
                 $this->attachSkills($job, $request->skills);
             }
             
-            // Store benefits if provided
-            if ($request->filled('benefits')) {
-                $job->update(['benefits' => $request->benefits]);
-            }
-            
             DB::commit();
             
-            // Log the activity
-            activity()
-                ->performedOn($job)
-                ->causedBy(auth()->user())
-                ->withProperties([
-                    'company' => $company->name,
-                    'title' => $job->title,
-                    'ip' => request()->ip(),
-                ])
-                ->log('Job posted');
+            // Simple logging without activity()
+            Log::channel('stack')->info('New job posted', [
+                'job_id' => $job->id,
+                'job_title' => $job->title,
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'user_id' => auth()->id(),
+            ]);
             
             return redirect()
                 ->route('employer.jobs.index')
                 ->with('success', 'Job posted successfully! It will be visible to job seekers after admin approval.');
                 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Job posting failed: ' . $e->getMessage());
-            return back()->with('error', 'Failed to post job. Please try again.')->withInput();
+            
+            // Log the actual error for debugging
+            Log::channel('stack')->error('Job posting failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'request_data' => $request->except('_token')
+            ]);
+            
+            // Return user-friendly error message
+            return back()
+                ->with('error', 'Failed to post job: ' . $e->getMessage())
+                ->withInput();
         }
     }
 
@@ -202,12 +214,10 @@ class JobController extends Controller
      */
     public function edit(JobPosting $job): View
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403, 'You do not have permission to edit this job.');
         }
         
-        // Check if job can be edited (not closed or expired)
         if ($job->status === 'closed') {
             return redirect()
                 ->route('employer.jobs.index')
@@ -230,9 +240,8 @@ class JobController extends Controller
     /**
      * Update the specified job.
      */
-     public function update(Request $request, JobPosting $job)
+    public function update(Request $request, JobPosting $job)
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403, 'You do not have permission to update this job.');
         }
@@ -256,68 +265,52 @@ class JobController extends Controller
             
             $newCompany = Company::findOrFail($validated['company_id']);
             
-            // Check if user has access to the new company
             if (!auth()->user()->canAccessCompany($newCompany)) {
-                abort(403, 'You do not have permission to move this job to another company.');
+                return back()->with('error', 'You do not have permission to move this job to another company.')
+                    ->withInput();
             }
             
-            // Check if new company is verified
             if ($newCompany->verification_status !== 'verified') {
-                return back()->with('error', 'Cannot move job to unverified company.')->withInput();
+                return back()->with('error', 'Cannot move job to unverified company.')
+                    ->withInput();
             }
             
             // Update slug if title changed
-            $slug = $job->title !== $validated['title'] 
-                ? Str::slug($validated['title']) . '-' . Str::random(6)
-                : $job->slug;
+            if ($job->title !== $validated['title']) {
+                $slug = Str::slug($validated['title']) . '-' . Str::random(6);
+                $job->slug = $slug;
+            }
             
-            // Update job
-            $job->update([
-                'title' => $validated['title'],
-                'slug' => $slug,
-                'description' => $validated['description'],
-                'company_id' => $validated['company_id'],
-                'location' => $validated['location'],
-                'job_type' => $validated['job_type'],
-                'category' => $validated['category'],
-                'experience_level' => $validated['experience_level'],
-                'salary_range' => $validated['salary_range'] ?? null,
-                'deadline' => $validated['deadline'],
-                // Reset status to pending for re-approval if significant changes
-                'status' => 'pending',
-                'verification_status' => 'pending',
-            ]);
+            // Update job fields
+            $job->title = $validated['title'];
+            $job->description = $validated['description'];
+            $job->company_id = $validated['company_id'];
+            $job->location = $validated['location'];
+            $job->job_type = $validated['job_type'];
+            $job->category = $validated['category'];
+            $job->experience_level = $validated['experience_level'];
+            $job->salary_range = $validated['salary_range'] ?? null;
+            $job->deadline = $validated['deadline'];
+            $job->status = 'pending';
+            $job->verification_status = 'pending';
+            
+            if ($request->filled('benefits')) {
+                $job->benefits = $request->benefits;
+            }
+            
+            $job->save();
             
             // Update skills if provided
             if ($request->filled('skills')) {
                 $this->attachSkills($job, $request->skills);
             }
             
-            // Update benefits if provided
-            if ($request->filled('benefits')) {
-                $job->update(['benefits' => $request->benefits]);
-            }
-            
             DB::commit();
 
-            // REMOVE OR COMMENT OUT THE ACTIVITY LOGGING
-            // activity()
-            //     ->performedOn($job)
-            //     ->causedBy(auth()->user())
-            //     ->withProperties([
-            //         'changes' => array_keys($validated),
-            //         'ip' => request()->ip(),
-            //     ])
-            //     ->log('Job updated');
-
-            // Instead, use Laravel's built-in logging if needed
-            Log::info('Job updated', [
+            Log::channel('stack')->info('Job updated', [
                 'job_id' => $job->id,
                 'job_title' => $job->title,
                 'user_id' => auth()->id(),
-                'company_id' => $job->company_id,
-                'changes' => array_keys($validated),
-                'ip' => request()->ip(),
             ]);
 
             return redirect()
@@ -326,11 +319,7 @@ class JobController extends Controller
                 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Job update failed: ' . $e->getMessage(), [
-                'job_id' => $job->id,
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::channel('stack')->error('Job update failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to update job. Please try again.')->withInput();
         }
     }
@@ -340,7 +329,6 @@ class JobController extends Controller
      */
     public function destroy(JobPosting $job)
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403, 'You do not have permission to delete this job.');
         }
@@ -349,22 +337,18 @@ class JobController extends Controller
             $jobTitle = $job->title;
             $job->delete();
             
-            // Log the activity
-            activity()
-                ->causedBy(auth()->user())
-                ->withProperties([
-                    'job_title' => $jobTitle,
-                    'company' => $job->company->name,
-                    'ip' => request()->ip(),
-                ])
-                ->log('Job deleted');
+            Log::channel('stack')->info('Job deleted', [
+                'job_id' => $job->id,
+                'job_title' => $jobTitle,
+                'user_id' => auth()->id(),
+            ]);
             
             return redirect()
                 ->route('employer.jobs.index')
                 ->with('success', 'Job deleted successfully.');
                 
         } catch (\Exception $e) {
-            Log::error('Job deletion failed: ' . $e->getMessage());
+            Log::channel('stack')->error('Job deletion failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to delete job. Please try again.');
         }
     }
@@ -374,7 +358,6 @@ class JobController extends Controller
      */
     public function applications(JobPosting $job, Request $request): View
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403, 'You do not have permission to view applications for this job.');
         }
@@ -382,15 +365,12 @@ class JobController extends Controller
         $query = $job->applications()
             ->with(['applicant' => function($q) {
                 $q->select('id', 'name', 'email', 'profile_photo_path', 'resume_path', 'headline');
-            }])
-            ->withCount('applicant');
+            }]);
         
-        // Apply status filter
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
         
-        // Apply search filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('applicant', function($q) use ($search) {
@@ -401,7 +381,6 @@ class JobController extends Controller
         
         $applications = $query->latest()->paginate(15);
         
-        // Get statistics for applications
         $stats = [
             'total' => $job->applications()->count(),
             'applied' => $job->applications()->where('status', 'applied')->count(),
@@ -418,9 +397,8 @@ class JobController extends Controller
      */
     public function updateApplicationStatus(Request $request, JobPosting $job, $applicationId)
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
         
         $request->validate([
@@ -428,22 +406,28 @@ class JobController extends Controller
         ]);
         
         $application = $job->applications()->findOrFail($applicationId);
+        $oldStatus = $application->status;
+        
         $application->update([
             'status' => $request->status,
             'status_updated_at' => now(),
         ]);
         
-        // Log the activity
-        activity()
-            ->performedOn($application)
-            ->causedBy(auth()->user())
-            ->withProperties([
-                'job_title' => $job->title,
-                'applicant' => $application->applicant->name,
-                'old_status' => $application->getOriginal('status'),
-                'new_status' => $request->status,
-            ])
-            ->log('Application status updated');
+        // Send notification to applicant
+        if ($request->status === 'shortlisted') {
+            NotificationService::applicationShortlisted($application);
+        } elseif ($request->status === 'rejected') {
+            NotificationService::applicationRejected($application);
+        } elseif ($request->status === 'hired') {
+            NotificationService::applicationHired($application);
+        }
+        
+        Log::channel('stack')->info('Application status updated', [
+            'application_id' => $application->id,
+            'job_title' => $job->title,
+            'old_status' => $oldStatus,
+            'new_status' => $request->status,
+        ]);
         
         if ($request->ajax()) {
             return response()->json([
@@ -463,108 +447,20 @@ class JobController extends Controller
      */
     public function close(JobPosting $job)
     {
-        // Check if user has access to this job's company
         if (!auth()->user()->canAccessCompany($job->company)) {
             abort(403, 'You do not have permission to close this job.');
         }
         
-        $job->update([
-            'status' => 'closed',
-        ]);
+        $job->update(['status' => 'closed']);
         
-        // Log the activity
-        activity()
-            ->performedOn($job)
-            ->causedBy(auth()->user())
-            ->withProperties([
-                'job_title' => $job->title,
-                'company' => $job->company->name,
-            ])
-            ->log('Job closed');
+        Log::channel('stack')->info('Job closed', [
+            'job_id' => $job->id,
+            'job_title' => $job->title,
+        ]);
         
         return redirect()
             ->route('employer.jobs.index')
-            ->with('success', 'Job closed successfully. No new applications will be accepted.');
-    }
-
-    /**
-     * Reopen a closed job posting
-     */
-    public function reopen(JobPosting $job)
-    {
-        // Check if user has access to this job's company
-        if (!auth()->user()->canAccessCompany($job->company)) {
-            abort(403, 'You do not have permission to reopen this job.');
-        }
-        
-        // Check if job is expired
-        if ($job->deadline && $job->deadline < now()->format('Y-m-d')) {
-            return redirect()
-                ->route('employer.jobs.index')
-                ->with('error', 'Cannot reopen expired jobs. Please extend the deadline first.');
-        }
-        
-        $job->update([
-            'status' => 'active',
-            'verification_status' => 'pending', // Needs re-approval
-        ]);
-        
-        // Log the activity
-        activity()
-            ->performedOn($job)
-            ->causedBy(auth()->user())
-            ->log('Job reopened');
-        
-        return redirect()
-            ->route('employer.jobs.index')
-            ->with('success', 'Job reopened and sent for re-approval.');
-    }
-
-    /**
-     * Extend job deadline
-     */
-    public function extendDeadline(Request $request, JobPosting $job)
-    {
-        // Check if user has access to this job's company
-        if (!auth()->user()->canAccessCompany($job->company)) {
-            abort(403, 'You do not have permission to extend this job.');
-        }
-        
-        $request->validate([
-            'new_deadline' => 'required|date|after:' . now()->format('Y-m-d')
-        ]);
-        
-        $job->update([
-            'deadline' => $request->new_deadline,
-        ]);
-        
-        return redirect()
-            ->route('employer.jobs.applications', $job)
-            ->with('success', 'Job deadline extended successfully.');
-    }
-
-    /**
-     * Duplicate a job posting
-     */
-    public function duplicate(JobPosting $job)
-    {
-        // Check if user has access to this job's company
-        if (!auth()->user()->canAccessCompany($job->company)) {
-            abort(403, 'You do not have permission to duplicate this job.');
-        }
-        
-        $newJob = $job->replicate();
-        $newJob->title = $job->title . ' (Copy)';
-        $newJob->slug = Str::slug($job->title . '-copy-' . uniqid());
-        $newJob->status = 'pending';
-        $newJob->verification_status = 'pending';
-        $newJob->created_at = now();
-        $newJob->updated_at = now();
-        $newJob->save();
-        
-        return redirect()
-            ->route('employer.jobs.edit', $newJob)
-            ->with('success', 'Job duplicated successfully. You can now edit the copy.');
+            ->with('success', 'Job closed successfully.');
     }
 
     /**
@@ -583,7 +479,7 @@ class JobController extends Controller
             ];
         }
         
-        $stats = [
+        return [
             'total' => JobPosting::whereIn('company_id', $companyIds)->count(),
             'active' => JobPosting::whereIn('company_id', $companyIds)
                 ->where('status', 'active')
@@ -608,8 +504,6 @@ class JobController extends Controller
                 ->get()
                 ->sum('applications_count'),
         ];
-        
-        return $stats;
     }
 
     /**
@@ -617,20 +511,25 @@ class JobController extends Controller
      */
     protected function attachSkills($job, $skillsString)
     {
-        // Split skills by comma
-        $skillsArray = array_map('trim', explode(',', $skillsString));
+        // Skip if no skills table or method doesn't exist
+        if (!method_exists($job, 'skills')) {
+            return $this;
+        }
         
-        // If you have a skills table, you can sync here
-        // This is a placeholder - implement based on your skills table structure
-        if (method_exists($job, 'skills')) {
-            $skillIds = [];
-            foreach ($skillsArray as $skillName) {
-                $skill = \App\Models\Skill::firstOrCreate(
-                    ['name' => $skillName],
-                    ['slug' => Str::slug($skillName)]
-                );
-                $skillIds[] = $skill->id;
-            }
+        $skillsArray = array_map('trim', explode(',', $skillsString));
+        $skillIds = [];
+        
+        foreach ($skillsArray as $skillName) {
+            if (empty($skillName)) continue;
+            
+            $skill = \App\Models\Skill::firstOrCreate(
+                ['name' => $skillName],
+                ['slug' => Str::slug($skillName)]
+            );
+            $skillIds[] = $skill->id;
+        }
+        
+        if (!empty($skillIds)) {
             $job->skills()->sync($skillIds);
         }
         

@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 
 use App\Models\JobPosting;
 use App\Models\Company;
+use App\Models\Report;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth; // ✅ ADD THIS LINE
-
+use Illuminate\Support\Facades\Auth;
 
 class JobController extends Controller
 {
@@ -32,7 +33,7 @@ class JobController extends Controller
             }])
             ->withCount('applications');
 
-        // Search by keyword (title, description, company name)
+        // Search by keyword
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
@@ -141,7 +142,6 @@ class JobController extends Controller
 
         // Get filter options for sidebar (cached for performance)
         $filterOptions = Cache::remember('job_filter_options', 3600, function () {
-            // Get categories with counts
             $categories = JobPosting::where('status', 'active')
                 ->where('verification_status', 'verified')
                 ->whereNotNull('category')
@@ -151,7 +151,6 @@ class JobController extends Controller
                 ->pluck('count', 'category')
                 ->toArray();
 
-            // Get locations with counts
             $locations = JobPosting::where('status', 'active')
                 ->where('verification_status', 'verified')
                 ->whereNotNull('location')
@@ -225,12 +224,7 @@ class JobController extends Controller
             ];
         });
 
-        return view('jobs.index', compact(
-            'jobs', 
-            'filterOptions', 
-            'featuredJobs',
-            'statistics'
-        ));
+        return view('jobs.index', compact('jobs', 'filterOptions', 'featuredJobs', 'statistics'));
     }
 
     /**
@@ -254,13 +248,9 @@ class JobController extends Controller
             ->withCount('applications')
             ->firstOrFail();
 
-        // Check if job is expired
         if ($job->deadline && $job->deadline < now()->format('Y-m-d')) {
             abort(404, 'This job posting has expired.');
         }
-
-        // Increment view count (if you have a views column)
-        // $job->increment('views');
 
         // Get similar jobs
         $similarJobs = JobPosting::where('status', 'active')
@@ -300,10 +290,7 @@ class JobController extends Controller
     }
 
     /**
-     * Quick apply to job (AJAX)
-     */
-    /**
-     * Apply for a job (AJAX)
+     * Apply for a job (AJAX) with notification
      */
     public function apply(Request $request, JobPosting $job)
     {
@@ -318,7 +305,7 @@ class JobController extends Controller
 
         $user = Auth::user();
 
-        // ✅ NEW: Check if user is the company owner
+        // Check if user is the company owner
         if ($job->company->owner_id === $user->id) {
             return response()->json([
                 'success' => false,
@@ -326,7 +313,7 @@ class JobController extends Controller
             ], 403);
         }
 
-        // ✅ NEW: Check if user is a team member of the company
+        // Check if user is a team member of the company
         if ($user->companies()->where('company_id', $job->company->id)->exists()) {
             return response()->json([
                 'success' => false,
@@ -377,9 +364,15 @@ class JobController extends Controller
                 'applied_at' => now(),
             ]);
 
+            // ✅ NOTIFICATION: Notify job seeker
+            NotificationService::jobApplied($application);
+
+            // ✅ NOTIFICATION: Notify employer
+            $employerId = $job->company->owner_id;
+            NotificationService::newApplication($application, $employerId);
+
             DB::commit();
 
-            // Log the activity
             Log::info('Job application submitted', [
                 'user_id' => $user->id,
                 'job_id' => $job->id,
@@ -407,53 +400,61 @@ class JobController extends Controller
         }
     }
 
-/**
- * Save/unsave a job (AJAX)
- */
-public function toggleSave(Request $request, JobPosting $job)
-{
-    // $job is already found by slug due to route model binding
-    
-    if (!Auth::check()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Please login to save jobs',
-            'redirect' => route('login')
-        ], 401);
-    }
-
-    $user = Auth::user();
-    
-    try {
-        if ($user->savedJobs()->where('job_posting_id', $job->id)->exists()) {
-            $user->savedJobs()->detach($job->id);
-            $saved = false;
-            $message = 'Job removed from saved';
-        } else {
-            $user->savedJobs()->attach($job->id);
-            $saved = true;
-            $message = 'Job saved successfully';
+    /**
+     * Save/unsave a job (AJAX)
+     */
+    public function toggleSave(Request $request, JobPosting $job)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please login to save jobs',
+                'redirect' => route('login')
+            ], 401);
         }
 
-        return response()->json([
-            'success' => true,
-            'saved' => $saved,
-            'message' => $message
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Job save toggle failed: ' . $e->getMessage());
+        $user = Auth::user();
         
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to save job. Please try again.'
-        ], 500);
+        try {
+            if ($user->savedJobs()->where('job_posting_id', $job->id)->exists()) {
+                $user->savedJobs()->detach($job->id);
+                $saved = false;
+                $message = 'Job removed from saved';
+            } else {
+                $user->savedJobs()->attach($job->id);
+                $saved = true;
+                $message = 'Job saved successfully';
+            }
+
+            return response()->json([
+                'success' => true,
+                'saved' => $saved,
+                'message' => $message
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Job save toggle failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save job. Please try again.'
+            ], 500);
+        }
     }
-}
 
-
+    /**
+     * Report a job
+     */
     public function report(Request $request)
     {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please login to report',
+                'redirect' => route('login')
+            ], 401);
+        }
+
         $request->validate([
             'job_id' => 'required|exists:job_postings,id',
             'reason' => 'required|in:spam,inappropriate,scam,expired,other',
@@ -463,7 +464,6 @@ public function toggleSave(Request $request, JobPosting $job)
         try {
             $job = JobPosting::findOrFail($request->job_id);
             
-            // Create report
             Report::create([
                 'reporter_id' => auth()->id(),
                 'reported_entity_type' => 'job',
@@ -474,7 +474,6 @@ public function toggleSave(Request $request, JobPosting $job)
                 'priority' => 'medium',
             ]);
             
-            // Log the report
             Log::info('Job reported', [
                 'job_id' => $job->id,
                 'job_title' => $job->title,
@@ -496,8 +495,6 @@ public function toggleSave(Request $request, JobPosting $job)
             ], 500);
         }
     }
-
-    
 
     /**
      * Get job suggestions for search (AJAX)
@@ -629,7 +626,6 @@ public function toggleSave(Request $request, JobPosting $job)
             ->where('verification_status', 'verified')
             ->with('company');
 
-        // Apply filters
         if ($request->filled('category')) {
             $query->where('category', $request->category);
         }
@@ -643,14 +639,12 @@ public function toggleSave(Request $request, JobPosting $job)
         $filename = 'jobs_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
         $handle = fopen('php://temp', 'w+');
 
-        // Add headers
         fputcsv($handle, [
             'ID', 'Title', 'Company', 'Location', 'Job Type', 
             'Category', 'Experience Level', 'Salary Range', 
             'Deadline', 'Posted Date', 'Status'
         ]);
 
-        // Add data
         foreach ($jobs as $job) {
             fputcsv($handle, [
                 $job->id,

@@ -5,468 +5,417 @@ namespace App\Services;
 
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\NotificationPreference;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
-    // ========== NOTIFICATION TYPES FOR ALL USERS ==========
-    
-    // Job Seeker Types
+    // ========== NOTIFICATION TYPES ==========
     const TYPE_JOB_APPLIED = 'job_applied';
-    const TYPE_JOB_VIEWED = 'job_viewed';
     const TYPE_JOB_SHORTLISTED = 'job_shortlisted';
     const TYPE_JOB_REJECTED = 'job_rejected';
     const TYPE_JOB_HIRED = 'job_hired';
-    
-    // Employer Types
-    const TYPE_NEW_APPLICATION = 'new_application';
-    const TYPE_JOB_APPROVED = 'job_approved';
-    const TYPE_JOB_REJECTED_ADMIN = 'job_rejected_admin';
-    const TYPE_JOB_EXPIRING = 'job_expiring';
+    const TYPE_JOB_ALERT = 'job_alert';
+    const TYPE_JOB_EXPIRED = 'job_expired';
+    const TYPE_NEW_APPLICANT = 'new_applicant';
+    const TYPE_APPLICATION_STATUS = 'application_status';
     const TYPE_COMPANY_VERIFIED = 'company_verified';
-    const TYPE_COMPANY_REJECTED = 'company_rejected';
-    const TYPE_COMPANY_SUSPENDED = 'company_suspended';
-    const TYPE_COMPANY_ACTIVATED = 'company_activated';
-    
-    // Admin Types
-    const TYPE_NEW_JOB_PENDING = 'new_job_pending';
-    const TYPE_NEW_COMPANY_PENDING = 'new_company_pending';
-    const TYPE_NEW_REPORT = 'new_report';
-    const TYPE_USER_REPORTED = 'user_reported';
-    
-    // Common Types
+    const TYPE_COMPANY_CREATED = 'company_created';
+    const TYPE_VERIFICATION_PENDING = 'verification_pending';
     const TYPE_WELCOME = 'welcome';
-    const TYPE_PASSWORD_CHANGED = 'password_changed';
-    const TYPE_ACCOUNT_SUSPENDED = 'account_suspended';
     
-    // ========== CATEGORIES ==========
-    const CATEGORY_APPLICATION = 'application';
-    const CATEGORY_JOB = 'job';
-    const CATEGORY_COMPANY = 'company';
-    const CATEGORY_SYSTEM = 'system';
-    const CATEGORY_MESSAGE = 'message';
+    // ========== PRIORITY LEVELS ==========
+    const PRIORITY_LOW = 'low';
+    const PRIORITY_MEDIUM = 'medium';
+    const PRIORITY_HIGH = 'high';
+    const PRIORITY_URGENT = 'urgent';
+    
+    // ========== CHANNELS ==========
+    const CHANNEL_DATABASE = 'database';
+    const CHANNEL_EMAIL = 'email';
+    const CHANNEL_PUSH = 'push';
     
     /**
-     * Send notification to ANY user (Job Seeker, Employer, or Admin)
+     * Main method to send notification through all channels
      */
-    public static function send($userId, $type, $title, $message, $data = [], $actionUrl = null)
-    {
+    public static function send(
+        int $userId, 
+        string $type, 
+        string $title, 
+        string $message, 
+        array $data = [], 
+        string $priority = self::PRIORITY_MEDIUM
+    ): ?Notification {
         try {
             $user = User::find($userId);
-            if (!$user) return null;
+            if (!$user) {
+                Log::warning("User not found for notification: {$userId}");
+                return null;
+            }
             
-            $config = self::getNotificationConfig($type);
+            // Get user preferences
+            $preferences = self::getUserPreferences($userId);
             
-            return Notification::create([
-                'user_id' => $userId,
-                'user_type' => self::getUserType($user),
+            // Determine channels based on type and preferences
+            $channels = $preferences->getEnabledChannelsForType($type);
+            
+            // Create database notification
+            $notification = null;
+            if (in_array(self::CHANNEL_DATABASE, $channels)) {
+                $notification = self::storeInDatabase($userId, $type, $title, $message, $data, $priority);
+            }
+            
+            // Send email if enabled
+            if (in_array(self::CHANNEL_EMAIL, $channels)) {
+                self::sendEmail($user, $type, $title, $message, $data);
+            }
+            
+            // Queue for real-time (Phase 2 - WebSockets)
+            if (in_array(self::CHANNEL_PUSH, $channels)) {
+                self::queueForRealTime($userId, $type, $title, $message, $data);
+            }
+            
+            Log::info("Notification sent to user {$userId}", [
                 'type' => $type,
-                'category' => $config['category'],
-                'title' => $title,
-                'message' => $message,
-                'data' => json_encode($data),
-                'action_url' => $actionUrl ?? $config['default_url'],
-                'icon' => $config['icon'],
-                'color' => $config['color'],
-                'priority' => $config['priority'],
-                'is_read' => false,
+                'channels' => $channels,
             ]);
+            
+            return $notification;
+            
         } catch (\Exception $e) {
-            Log::error('Failed to send notification: ' . $e->getMessage());
+            Log::error('Notification failed: ' . $e->getMessage(), [
+                'user_id' => $userId,
+                'type' => $type,
+                'trace' => $e->getTraceAsString(),
+            ]);
             return null;
         }
     }
     
     /**
-     * Get notification configuration based on type
+     * Store notification in database
      */
-    protected static function getNotificationConfig($type)
+    protected static function storeInDatabase(
+        int $userId, 
+        string $type, 
+        string $title, 
+        string $message, 
+        array $data, 
+        string $priority
+    ): Notification {
+        return Notification::create([
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'data' => $data,
+            'priority' => $priority,
+            'channel' => self::CHANNEL_DATABASE,
+            'sent_at' => now(),
+        ]);
+    }
+    
+    /**
+     * Send email notification
+     */
+    protected static function sendEmail(User $user, string $type, string $title, string $message, array $data): void
     {
-        $configs = [
-            // ========== JOB SEEKER NOTIFICATIONS ==========
-            self::TYPE_JOB_APPLIED => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '📝',
-                'color' => 'blue',
-                'priority' => 'medium',
-                'default_url' => route('applications.index'),
-            ],
-            self::TYPE_JOB_VIEWED => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '👀',
-                'color' => 'purple',
-                'priority' => 'medium',
-                'default_url' => route('applications.index'),
-            ],
-            self::TYPE_JOB_SHORTLISTED => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '⭐',
-                'color' => 'green',
-                'priority' => 'high',
-                'default_url' => route('applications.index'),
-            ],
-            self::TYPE_JOB_REJECTED => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '❌',
-                'color' => 'red',
-                'priority' => 'medium',
-                'default_url' => route('applications.index'),
-            ],
-            self::TYPE_JOB_HIRED => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '🎉',
-                'color' => 'emerald',
-                'priority' => 'urgent',
-                'default_url' => route('applications.index'),
-            ],
-            
-            // ========== EMPLOYER NOTIFICATIONS ==========
-            self::TYPE_NEW_APPLICATION => [
-                'category' => self::CATEGORY_APPLICATION,
-                'icon' => '📩',
-                'color' => 'orange',
-                'priority' => 'high',
-                'default_url' => route('employer.applicants.index'),
-            ],
-            self::TYPE_JOB_APPROVED => [
-                'category' => self::CATEGORY_JOB,
-                'icon' => '✅',
-                'color' => 'green',
-                'priority' => 'high',
-                'default_url' => route('employer.jobs.index'),
-            ],
-            self::TYPE_JOB_REJECTED_ADMIN => [
-                'category' => self::CATEGORY_JOB,
-                'icon' => '⚠️',
-                'color' => 'red',
-                'priority' => 'high',
-                'default_url' => route('employer.jobs.index'),
-            ],
-            self::TYPE_JOB_EXPIRING => [
-                'category' => self::CATEGORY_JOB,
-                'icon' => '⏰',
-                'color' => 'yellow',
-                'priority' => 'medium',
-                'default_url' => route('employer.jobs.index'),
-            ],
-            self::TYPE_COMPANY_VERIFIED => [
-                'category' => self::CATEGORY_COMPANY,
-                'icon' => '🏢',
-                'color' => 'teal',
-                'priority' => 'high',
-                'default_url' => route('employer.dashboard'),
-            ],
-            self::TYPE_COMPANY_REJECTED => [
-                'category' => self::CATEGORY_COMPANY,
-                'icon' => '📋',
-                'color' => 'red',
-                'priority' => 'high',
-                'default_url' => route('employer.company.create'),
-            ],
-            self::TYPE_COMPANY_SUSPENDED => [
-                'category' => self::CATEGORY_COMPANY,
-                'icon' => '🚫',
-                'color' => 'red',
-                'priority' => 'urgent',
-                'default_url' => route('contact'),
-            ],
-            self::TYPE_COMPANY_ACTIVATED => [
-                'category' => self::CATEGORY_COMPANY,
-                'icon' => '✅',
-                'color' => 'green',
-                'priority' => 'high',
-                'default_url' => route('employer.dashboard'),
-            ],
-            
-            // ========== ADMIN NOTIFICATIONS ==========
-            self::TYPE_NEW_JOB_PENDING => [
-                'category' => self::CATEGORY_JOB,
-                'icon' => '📄',
-                'color' => 'yellow',
-                'priority' => 'high',
-                'default_url' => route('admin.jobs.pending'),
-            ],
-            self::TYPE_NEW_COMPANY_PENDING => [
-                'category' => self::CATEGORY_COMPANY,
-                'icon' => '🏢',
-                'color' => 'yellow',
-                'priority' => 'high',
-                'default_url' => route('admin.companies.pending'),
-            ],
-            self::TYPE_NEW_REPORT => [
-                'category' => self::CATEGORY_SYSTEM,
-                'icon' => '🚩',
-                'color' => 'red',
-                'priority' => 'urgent',
-                'default_url' => route('admin.reports.index'),
-            ],
-            self::TYPE_USER_REPORTED => [
-                'category' => self::CATEGORY_SYSTEM,
-                'icon' => '👤',
-                'color' => 'orange',
-                'priority' => 'high',
-                'default_url' => route('admin.users.index'),
-            ],
-            
-            // ========== COMMON NOTIFICATIONS ==========
-            self::TYPE_WELCOME => [
-                'category' => self::CATEGORY_SYSTEM,
-                'icon' => '👋',
-                'color' => 'blue',
-                'priority' => 'low',
-                'default_url' => route('dashboard'),
-            ],
-            self::TYPE_PASSWORD_CHANGED => [
-                'category' => self::CATEGORY_SYSTEM,
-                'icon' => '🔒',
-                'color' => 'gray',
-                'priority' => 'low',
-                'default_url' => '#',
-            ],
-            self::TYPE_ACCOUNT_SUSPENDED => [
-                'category' => self::CATEGORY_SYSTEM,
-                'icon' => '⚠️',
-                'color' => 'red',
-                'priority' => 'urgent',
-                'default_url' => route('contact'),
-            ],
+        // Only send email for important notifications
+        $importantTypes = [
+            self::TYPE_JOB_SHORTLISTED,
+            self::TYPE_JOB_HIRED,
+            self::TYPE_JOB_ALERT,
+            self::TYPE_NEW_APPLICANT,
+            self::TYPE_COMPANY_VERIFIED,
+            self::TYPE_JOB_EXPIRED,
         ];
         
-        return $configs[$type] ?? [
-            'category' => self::CATEGORY_SYSTEM,
-            'icon' => '🔔',
-            'color' => 'gray',
-            'priority' => 'medium',
-            'default_url' => '#',
-        ];
+        if (!in_array($type, $importantTypes)) {
+            return;
+        }
+        
+        try {
+            Mail::send('emails.notification', [
+                'user' => $user,
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+                'type' => $type,
+            ], function ($mail) use ($user, $title) {
+                $mail->to($user->email)
+                     ->subject($title . ' - WorkNepal');
+            });
+        } catch (\Exception $e) {
+            Log::error('Email notification failed: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'type' => $type,
+            ]);
+        }
     }
     
     /**
-     * Get user type automatically
+     * Queue for real-time broadcasting (Phase 2)
      */
-    protected static function getUserType($user)
+    protected static function queueForRealTime(int $userId, string $type, string $title, string $message, array $data): void
     {
-        if ($user->hasRole('super_admin') || $user->hasRole('admin')) {
-            return 'admin';
-        }
-        if ($user->hasRole('employer')) {
-            return 'employer';
-        }
-        return 'job_seeker';
+        // Phase 2 implementation with Pusher/Laravel WebSockets
+        // event(new \App\Events\NotificationSent($userId, $type, $title, $message, $data));
     }
     
     /**
-     * Get unread count for any user
+     * Get user notification preferences
      */
-    public static function getUnreadCount($userId)
+    protected static function getUserPreferences(int $userId): NotificationPreference
+    {
+        $preferences = NotificationPreference::firstOrCreate(
+            ['user_id' => $userId],
+            [
+                'email_job_alerts' => true,
+                'email_application_updates' => true,
+                'push_job_alerts' => false,
+                'push_application_updates' => true,
+                'db_notifications' => true,
+                'email_digest_frequency' => 'daily',
+            ]
+        );
+        
+        return $preferences;
+    }
+    
+    // ========== JOB SEEKER NOTIFICATIONS ==========
+    
+    public static function jobApplied($application): ?Notification
+    {
+        $job = $application->jobPosting;
+        return self::send(
+            $application->user_id,
+            self::TYPE_JOB_APPLIED,
+            'Application Submitted Successfully',
+            "You applied for {$job->title} at {$job->company->name}",
+            [
+                'job_id' => $job->id,
+                'job_title' => $job->title,
+                'company_id' => $job->company_id,
+                'company_name' => $job->company->name,
+                'application_id' => $application->id,
+            ],
+            self::PRIORITY_MEDIUM
+        );
+    }
+    
+    public static function applicationStatusUpdated($application, string $oldStatus, string $newStatus): ?Notification
+    {
+        $job = $application->jobPosting;
+        
+        $statusMessages = [
+            'shortlisted' => 'Congratulations! You have been shortlisted 🎯',
+            'rejected' => 'Application Update',
+            'hired' => '🎉 Congratulations! You got the job!',
+            'viewed' => 'Application Viewed',
+        ];
+        
+        $statusDetails = [
+            'shortlisted' => "Great news! {$job->company->name} has shortlisted you for {$job->title}",
+            'rejected' => "Thank you for your interest. {$job->company->name} has moved forward with other candidates for {$job->title}",
+            'hired' => "Amazing news! {$job->company->name} has offered you the position of {$job->title}",
+            'viewed' => "{$job->company->name} has viewed your application for {$job->title}",
+        ];
+        
+        $priority = $newStatus === 'hired' ? self::PRIORITY_URGENT : self::PRIORITY_MEDIUM;
+        
+        return self::send(
+            $application->user_id,
+            self::TYPE_APPLICATION_STATUS,
+            $statusMessages[$newStatus] ?? 'Application Status Updated',
+            $statusDetails[$newStatus] ?? "Your application status has been updated to {$newStatus}",
+            [
+                'job_id' => $job->id,
+                'job_title' => $job->title,
+                'application_id' => $application->id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ],
+            $priority
+        );
+    }
+    
+    // ========== EMPLOYER NOTIFICATIONS ==========
+    
+    public static function newApplicant($application, int $employerId): ?Notification
+    {
+        $job = $application->jobPosting;
+        return self::send(
+            $employerId,
+            self::TYPE_NEW_APPLICANT,
+            'New Application Received 📩',
+            "{$application->applicant->name} applied for {$job->title}",
+            [
+                'job_id' => $job->id,
+                'job_title' => $job->title,
+                'application_id' => $application->id,
+                'applicant_id' => $application->applicant->id,
+                'applicant_name' => $application->applicant->name,
+            ],
+            self::PRIORITY_HIGH
+        );
+    }
+    
+    public static function jobExpired($job, int $employerId): ?Notification
+    {
+        return self::send(
+            $employerId,
+            self::TYPE_JOB_EXPIRED,
+            'Job Posting Expired ⚠️',
+            "Your job posting '{$job->title}' has expired. Renew it to continue receiving applications.",
+            [
+                'job_id' => $job->id,
+                'job_title' => $job->title,
+            ],
+            self::PRIORITY_MEDIUM
+        );
+    }
+    
+    // ========== ADMIN NOTIFICATIONS ==========
+    
+    public static function companyCreated($company, int $adminId): ?Notification
+    {
+        return self::send(
+            $adminId,
+            self::TYPE_COMPANY_CREATED,
+            'New Company Registered 🏢',
+            "{$company->name} has registered and needs verification",
+            [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'owner_id' => $company->owner_id,
+                'owner_name' => $company->owner->name ?? 'Unknown',
+            ],
+            self::PRIORITY_HIGH
+        );
+    }
+    
+    public static function verificationPending($company, int $adminId): ?Notification
+    {
+        return self::send(
+            $adminId,
+            self::TYPE_VERIFICATION_PENDING,
+            'Company Verification Required ⏳',
+            "Company '{$company->name}' is pending verification. Please review their documents.",
+            [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+            ],
+            self::PRIORITY_HIGH
+        );
+    }
+    
+    // ========== COMPANY OWNER NOTIFICATIONS ==========
+    
+    public static function companyVerified($company, int $ownerId): ?Notification
+    {
+        return self::send(
+            $ownerId,
+            self::TYPE_COMPANY_VERIFIED,
+            'Company Verified ✅',
+            "Congratulations! Your company '{$company->name}' has been verified. You can now post jobs.",
+            [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+            ],
+            self::PRIORITY_HIGH
+        );
+    }
+    
+    // ========== JOB ALERT NOTIFICATIONS ==========
+    
+    public static function jobAlert(int $userId, $jobs, string $alertName = 'Your Job Alert'): ?Notification
+    {
+        $jobCount = $jobs->count();
+        
+        if ($jobCount === 0) {
+            return null;
+        }
+        
+        $jobTitles = $jobs->take(3)->pluck('title')->implode(', ');
+        $moreText = $jobCount > 3 ? " and {$jobCount->sub(3)} more" : '';
+        
+        return self::send(
+            $userId,
+            self::TYPE_JOB_ALERT,
+            "{$jobCount} New Jobs Matching '{$alertName}' 🔔",
+            "{$jobTitles}{$moreText} - New opportunities waiting for you!",
+            [
+                'jobs' => $jobs->map(fn($j) => ['id' => $j->id, 'title' => $j->title])->toArray(),
+                'count' => $jobCount,
+                'alert_name' => $alertName,
+            ],
+            self::PRIORITY_MEDIUM
+        );
+    }
+    
+    // ========== WELCOME NOTIFICATIONS ==========
+    
+    public static function welcome(int $userId, string $name): ?Notification
+    {
+        return self::send(
+            $userId,
+            self::TYPE_WELCOME,
+            'Welcome to WorkNepal! 👋',
+            "Hi {$name}, welcome to Nepal's #1 job platform. Complete your profile to get started.",
+            [
+                'user_name' => $name,
+            ],
+            self::PRIORITY_MEDIUM
+        );
+    }
+    
+    // ========== UTILITY METHODS ==========
+    
+    public static function getUnreadCount(int $userId): int
     {
         return Notification::where('user_id', $userId)
             ->where('is_read', false)
             ->count();
     }
     
-    /**
-     * Mark all as read for any user
-     */
-    public static function markAllAsRead($userId)
+    public static function markAllAsRead(int $userId): int
     {
         return Notification::where('user_id', $userId)
             ->where('is_read', false)
-            ->update(['is_read' => true, 'read_at' => now()]);
+            ->update([
+                'is_read' => true,
+                'read_at' => now(),
+            ]);
     }
     
-    // ========== JOB SEEKER METHODS ==========
-    
-    public static function jobApplied($application)
+    public static function deleteOldNotifications(int $days = 30): int
     {
-        $job = $application->jobPosting;
-        return self::send(
-            $application->user_id,
-            self::TYPE_JOB_APPLIED,
-            'Application Submitted',
-            "You applied for {$job->title} at {$job->company->name}",
-            ['job_id' => $job->id, 'company_id' => $job->company_id],
-            route('jobs.show', $job->slug)
-        );
+        return Notification::where('created_at', '<', now()->subDays($days))
+            ->where('is_read', true)
+            ->delete();
     }
     
-    public static function applicationViewed($application)
+    public static function getNotificationTypes(): array
     {
-        $job = $application->jobPosting;
-        return self::send(
-            $application->user_id,
-            self::TYPE_JOB_VIEWED,
-            'Application Viewed',
-            "Your application for {$job->title} has been viewed by {$job->company->name}",
-            ['job_id' => $job->id],
-            route('applications.show', $application)
-        );
-    }
-    
-    public static function applicationShortlisted($application)
-    {
-        $job = $application->jobPosting;
-        return self::send(
-            $application->user_id,
-            self::TYPE_JOB_SHORTLISTED,
-            'Congratulations! You\'ve been Shortlisted 🎯',
-            "Great news! {$job->company->name} has shortlisted you for {$job->title}",
-            ['job_id' => $job->id],
-            route('applications.show', $application)
-        );
-    }
-    
-    public static function applicationRejected($application)
-    {
-        $job = $application->jobPosting;
-        return self::send(
-            $application->user_id,
-            self::TYPE_JOB_REJECTED,
-            'Application Update',
-            "Thank you for your interest. {$job->company->name} has moved forward with other candidates",
-            ['job_id' => $job->id],
-            route('jobs.index')
-        );
-    }
-    
-    public static function applicationHired($application)
-    {
-        $job = $application->jobPosting;
-        return self::send(
-            $application->user_id,
-            self::TYPE_JOB_HIRED,
-            '🎉 Congratulations! You\'re Hired!',
-            "Amazing news! {$job->company->name} has offered you the position of {$job->title}",
-            ['job_id' => $job->id],
-            route('applications.show', $application)
-        );
-    }
-    
-    // ========== EMPLOYER METHODS ==========
-    
-    public static function newApplication($application, $employerId)
-    {
-        $job = $application->jobPosting;
-        return self::send(
-            $employerId,
-            self::TYPE_NEW_APPLICATION,
-            'New Application Received 📩',
-            "{$application->applicant->name} applied for {$job->title}",
-            ['job_id' => $job->id, 'application_id' => $application->id],
-            route('employer.applicants.show', $application)
-        );
-    }
-    
-    public static function jobApproved($job, $employerId)
-    {
-        return self::send(
-            $employerId,
-            self::TYPE_JOB_APPROVED,
-            'Job Approved ✅',
-            "Your job \"{$job->title}\" has been approved and is now live",
-            ['job_id' => $job->id],
-            route('jobs.show', $job->slug)
-        );
-    }
-    
-    public static function jobRejected($job, $employerId, $reason)
-    {
-        return self::send(
-            $employerId,
-            self::TYPE_JOB_REJECTED_ADMIN,
-            'Job Posting Update',
-            "Your job \"{$job->title}\" was not approved. Reason: {$reason}",
-            ['job_id' => $job->id, 'reason' => $reason],
-            route('employer.jobs.index')
-        );
-    }
-    
-    public static function jobExpiring($employerId, $job)
-    {
-        $daysLeft = now()->diffInDays($job->deadline);
-        return self::send(
-            $employerId,
-            self::TYPE_JOB_EXPIRING,
-            'Job Expiring Soon ⏰',
-            "Your job \"{$job->title}\" will expire in {$daysLeft} days",
-            ['job_id' => $job->id, 'days_left' => $daysLeft],
-            route('employer.jobs.edit', $job)
-        );
-    }
-    
-    public static function companyVerified($company, $ownerId)
-    {
-        return self::send(
-            $ownerId,
-            self::TYPE_COMPANY_VERIFIED,
-            'Company Verified ✅',
-            "Your company \"{$company->name}\" has been verified. You can now post jobs!",
-            ['company_id' => $company->id],
-            route('employer.dashboard')
-        );
-    }
-    
-    public static function companyRejected($company, $ownerId, $reason)
-    {
-        return self::send(
-            $ownerId,
-            self::TYPE_COMPANY_REJECTED,
-            'Company Verification Update',
-            "Your company \"{$company->name}\" verification was not approved. Reason: {$reason}",
-            ['company_id' => $company->id, 'reason' => $reason],
-            route('employer.company.create')
-        );
-    }
-    
-    // ========== ADMIN METHODS ==========
-    
-    public static function newJobPending($job, $adminId)
-    {
-        return self::send(
-            $adminId,
-            self::TYPE_NEW_JOB_PENDING,
-            'New Job Pending Approval',
-            "{$job->company->name} posted a new job: {$job->title}",
-            ['job_id' => $job->id, 'company_id' => $job->company_id],
-            route('admin.jobs.show', $job)
-        );
-    }
-    
-    public static function newCompanyPending($company, $adminId)
-    {
-        return self::send(
-            $adminId,
-            self::TYPE_NEW_COMPANY_PENDING,
-            'New Company Pending Verification',
-            "{$company->name} has registered and needs verification",
-            ['company_id' => $company->id],
-            route('admin.companies.show', $company)
-        );
-    }
-    
-    public static function newReport($report, $adminId)
-    {
-        return self::send(
-            $adminId,
-            self::TYPE_NEW_REPORT,
-            'New Report Submitted 🚩',
-            "A user has reported content. Please review.",
-            ['report_id' => $report->id],
-            route('admin.reports.show', $report)
-        );
-    }
-    
-    // ========== COMMON METHODS ==========
-    
-    public static function welcome($userId, $name)
-    {
-        return self::send(
-            $userId,
-            self::TYPE_WELCOME,
-            'Welcome to WorkNepal! 👋',
-            "Hi {$name}, welcome to Nepal's #1 job platform. Start exploring opportunities today!",
-            [],
-            route('dashboard')
-        );
+        return [
+            'job_seeker' => [
+                self::TYPE_JOB_APPLIED => 'Job Applied',
+                self::TYPE_APPLICATION_STATUS => 'Application Status Update',
+                self::TYPE_JOB_ALERT => 'Job Alerts',
+            ],
+            'employer' => [
+                self::TYPE_NEW_APPLICANT => 'New Applicant',
+                self::TYPE_JOB_EXPIRED => 'Job Expired',
+                self::TYPE_COMPANY_VERIFIED => 'Company Verified',
+            ],
+            'admin' => [
+                self::TYPE_COMPANY_CREATED => 'New Company Registration',
+                self::TYPE_VERIFICATION_PENDING => 'Verification Pending',
+            ],
+            'common' => [
+                self::TYPE_WELCOME => 'Welcome Message',
+            ],
+        ];
     }
 }

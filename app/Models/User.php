@@ -579,29 +579,71 @@ public function canAccessCompany(Company $company): bool
                 ->withTimestamps();
 }
 
+ /**
+     * Get all notifications for the user
+     */
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
+    }
+    
     /**
- * Get notifications for the user
- */
-public function notifications()
-{
-    return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
-}
-
-/**
- * Get unread notifications
- */
-public function unreadNotifications()
-{
-    return $this->hasMany(Notification::class)->where('is_read', false);
-}
-
-/**
- * Get unread notification count
- */
-public function getUnreadNotificationCountAttribute()
-{
-    return $this->unreadNotifications()->count();
-}
+     * Get unread notifications
+     */
+    public function unreadNotifications()
+    {
+        return $this->hasMany(Notification::class)->where('is_read', false);
+    }
+    
+    /**
+     * Get notification preferences
+     */
+    public function notificationPreference()
+    {
+        return $this->hasOne(NotificationPreference::class);
+    }
+    
+    /**
+     * Get job alerts for the user
+     */
+    public function jobAlerts()
+    {
+        return $this->hasMany(JobAlert::class);
+    }
+    
+    // ========== NOTIFICATION HELPER METHODS ==========
+    
+    /**
+     * Get unread notification count
+     */
+    public function getUnreadNotificationCountAttribute(): int
+    {
+        return $this->unreadNotifications()->count();
+    }
+    
+    /**
+     * Get recent notifications for dropdown
+     */
+    public function getRecentNotificationsAttribute()
+    {
+        return $this->notifications()->limit(10)->get();
+    }
+    
+    /**
+     * Check if user has notification preferences
+     */
+    public function hasNotificationPreferences(): bool
+    {
+        return $this->notificationPreference()->exists();
+    }
+    
+    /**
+     * Get or create notification preferences
+     */
+    public function getNotificationPreferences(): NotificationPreference
+    {
+        return $this->notificationPreference()->firstOrCreate([]);
+    }
 
     /**
      * Activity logs for the user

@@ -170,4 +170,21 @@ class JobAlertController extends Controller
         
         return $query->limit(10)->get();
     }
+
+
+    /**
+ * Show edit form for job alert (AJAX)
+ */
+public function edit(JobAlert $alert)
+{
+    if ($alert->user_id !== auth()->id()) {
+        abort(403);
+    }
+    
+    return view('components.job-alert-form', [
+        'alert' => $alert,
+        'submitUrl' => route('job-alerts.update', $alert),
+        'buttonText' => 'Update Alert'
+    ]);
+}
 }

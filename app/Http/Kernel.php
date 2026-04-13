@@ -21,7 +21,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \App\Http\Middleware\LogActivity::class,
+        // ❌ REMOVED: LogActivity from global stack (moved to web group)
     ];
 
     /**
@@ -38,12 +38,12 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SetDefaultDashboard::class,
-
+            \App\Http\Middleware\LogActivity::class, // ✅ MOVED HERE (only for web requests)
         ],
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];
@@ -56,6 +56,7 @@ class Kernel extends HttpKernel
      * @var array<string, class-string|string>
      */
     protected $middlewareAliases = [
+        // Laravel Default
         'auth' => \App\Http\Middleware\Authenticate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.session' => \Illuminate\Session\Middleware\AuthenticateSession::class,
@@ -68,7 +69,32 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
+        // ✅ Custom Middleware (All properly defined)
         'role' => \App\Http\Middleware\RoleMiddleware::class,
         'account.active' => \App\Http\Middleware\CheckAccountStatus::class,
+        'set.dashboard' => \App\Http\Middleware\SetDefaultDashboard::class,
+        'log.activity' => \App\Http\Middleware\LogActivity::class,
+        'security.headers' => \App\Http\Middleware\SecurityHeaders::class, // ✅ Added for production
+    ];
+
+    /**
+     * The application's middleware priority.
+     *
+     * This determines the order in which middleware is executed.
+     *
+     * @var array<int, string>
+     */
+    protected $middlewarePriority = [
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \App\Http\Middleware\Authenticate::class,
+        \Illuminate\Routing\Middleware\ThrottleRequests::class,
+        \Illuminate\Session\Middleware\AuthenticateSession::class,
+        \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        \Illuminate\Auth\Middleware\Authorize::class,
+        \App\Http\Middleware\RoleMiddleware::class,
+        \App\Http\Middleware\CheckAccountStatus::class,
+        \App\Http\Middleware\SetDefaultDashboard::class,
+        \App\Http\Middleware\LogActivity::class,
     ];
 }

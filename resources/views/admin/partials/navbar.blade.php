@@ -4,61 +4,7 @@
     use App\Services\NotificationService;
 @endphp
 
-<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40" 
-     x-data="{ 
-        profileOpen: false, 
-        notificationsOpen: false, 
-        searchOpen: false,
-        unreadCount: {{ $unreadCount ?? 0 }},
-        notifications: @json($recentNotifications ?? []),
-        fetchNotifications() {
-            fetch('{{ route("admin.notifications.recent") }}')
-                .then(response => response.json())
-                .then(data => {
-                    this.notifications = data.notifications;
-                    this.unreadCount = data.unread_count;
-                })
-                .catch(error => console.error('Error fetching notifications:', error));
-        },
-        markAsRead(notificationId) {
-            fetch(`{{ route("admin.notifications.read", '') }}/${notificationId}`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.fetchNotifications();
-                }
-            })
-            .catch(error => console.error('Error marking notification as read:', error));
-        },
-        markAllAsRead() {
-            fetch('{{ route("admin.notifications.mark-all-read") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.fetchNotifications();
-                }
-            })
-            .catch(error => console.error('Error marking all as read:', error));
-        }
-     }" 
-     x-init="
-        @auth
-            fetchNotifications();
-            setInterval(() => fetchNotifications(), 30000);
-        @endauth
-     ">
+<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">
             {{-- Left side - Mobile menu button --}}
@@ -86,8 +32,6 @@
             {{-- Right side - Notifications, Search & Profile --}}
             <div class="flex items-center gap-x-3 lg:gap-x-5">
                 
-                
-
                 {{-- Quick Actions (for super admin) --}}
                 @if(auth()->user()->isSuperAdmin() && Route::has('admin.settings.index'))
                     <div class="hidden lg:flex items-center gap-2">
@@ -102,84 +46,31 @@
                     </div>
                 @endif
 
-                {{-- Notifications Dropdown --}}
-                <div class="relative" @click.away="notificationsOpen = false">
-                    <button type="button" @click="notificationsOpen = !notificationsOpen" class="relative p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <span class="sr-only">View notifications</span>
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                        </svg>
-                        <span x-show="unreadCount > 0" 
-                              x-text="unreadCount > 9 ? '9+' : unreadCount"
-                              class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse"
-                              style="display: none;">
+                {{-- Notifications Bell - Direct Link (LinkedIn Style) --}}
+                @php
+                    try {
+                        $unreadCount = auth()->user()->unreadNotifications()->count();
+                    } catch (\Exception $e) {
+                        $unreadCount = 0;
+                    }
+                @endphp
+                
+                <a href="{{ route('notifications.index') }}" 
+                   class="relative p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                   title="View notifications">
+                    <span class="sr-only">View notifications</span>
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                    </svg>
+                    @if($unreadCount > 0)
+                        <span class="absolute top-1 right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                            {{ $unreadCount > 99 ? '99+' : $unreadCount }}
                         </span>
-                    </button>
-
-                    {{-- Notifications Panel --}}
-                    <div x-show="notificationsOpen" 
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 -translate-y-2"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 -translate-y-2"
-                         class="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50"
-                         style="display: none;">
-                        
-                        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                            <button x-show="unreadCount > 0" 
-                                    @click="markAllAsRead()"
-                                    class="text-xs text-red-600 hover:text-red-700 font-medium">
-                                Mark all as read
-                            </button>
-                        </div>
-                        
-                        <div class="max-h-96 overflow-y-auto">
-                            <template x-if="notifications.length === 0">
-                                <div class="px-4 py-8 text-center">
-                                    <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                    </svg>
-                                    <p class="text-gray-500 dark:text-gray-400">No notifications</p>
-                                </div>
-                            </template>
-                            
-                            <template x-for="notification in notifications" :key="notification.id">
-                                <a :href="notification.action_url" 
-                                   @click="markAsRead(notification.id)"
-                                   class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                                   :class="{'bg-blue-50 dark:bg-blue-900/10': !notification.is_read}">
-                                    <div class="flex items-start gap-3">
-                                        <div class="flex-shrink-0">
-                                            <span class="text-xl" x-text="notification.icon"></span>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="notification.title"></p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="notification.message"></p>
-                                            <p class="text-xs text-gray-400 mt-1" x-text="notification.created_at"></p>
-                                        </div>
-                                        <div x-show="!notification.is_read" class="flex-shrink-0">
-                                            <span class="w-2 h-2 bg-red-600 rounded-full inline-block"></span>
-                                        </div>
-                                    </div>
-                                </a>
-                            </template>
-                        </div>
-                        
-                        @if(Route::has('admin.notifications.index'))
-                        <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-center">
-                            <a href="{{ route('admin.notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 font-medium">
-                                View all notifications
-                            </a>
-                        </div>
-                        @endif
-                    </div>
-                </div>
+                    @endif
+                </a>
 
                 {{-- Profile Dropdown --}}
-                <div class="relative" @click.away="profileOpen = false">
+                <div class="relative" x-data="{ profileOpen: false }" @click.away="profileOpen = false">
                     <button type="button" @click="profileOpen = !profileOpen" class="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full pl-2 pr-3 py-1.5 transition">
                         <span class="sr-only">Open user menu</span>
                         <div class="h-8 w-8 rounded-full bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center text-white font-semibold text-sm overflow-hidden ring-2 ring-white dark:ring-gray-800">

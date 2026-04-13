@@ -1,4 +1,4 @@
-{{-- Determine which layout to use based on user role --}}
+{{-- resources/views/notifications/index.blade.php --}}
 @php
     $user = auth()->user();
     $isAdmin = $user->hasRole('admin') || $user->hasRole('super_admin');
@@ -10,7 +10,7 @@
 @section('title', 'Notifications - WorkNepal')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 {{ $isAdmin ? '' : 'bg-gray-50 dark:bg-gray-900' }} min-h-screen">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 {{ !$isAdmin ? 'bg-gray-50 dark:bg-gray-900' : '' }} min-h-screen">
     
     {{-- Header --}}
     <div class="mb-8">
@@ -22,15 +22,21 @@
                 </p>
             </div>
             <div class="mt-4 md:mt-0 flex gap-3">
-                @if($unreadCount > 0)
+                @if(($stats['unread'] ?? 0) > 0)
                     <button id="markAllReadBtn" 
-                            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                            class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
                         Mark all as read
                     </button>
                 @endif
-                @if($notifications->count() > 0)
+                @if(($stats['total'] ?? 0) > 0)
                     <button id="clearAllBtn" 
-                            class="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition">
+                            class="inline-flex items-center px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-all">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
                         Clear all
                     </button>
                 @endif
@@ -40,11 +46,11 @@
 
     {{-- Statistics Cards --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Total</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($stats['total']) }}</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($stats['total'] ?? 0) }}</p>
                 </div>
                 <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,11 +60,11 @@
             </div>
         </div>
         
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Unread</p>
-                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-500">{{ number_format($stats['unread']) }}</p>
+                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-500">{{ number_format($stats['unread'] ?? 0) }}</p>
                 </div>
                 <div class="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
                     <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,159 +74,69 @@
             </div>
         </div>
         
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Applications</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-500">{{ number_format($stats['application']) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Read</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-500">{{ number_format(($stats['total'] ?? 0) - ($stats['unread'] ?? 0)) }}</p>
                 </div>
                 <div class="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                     <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">System</p>
-                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-500">{{ number_format($stats['system']) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Categories</p>
+                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-500">{{ count($stats['by_type'] ?? []) }}</p>
                 </div>
                 <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
                     <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                     </svg>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- Category Filters --}}
+    {{-- Filters --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('notifications.index') }}" 
-               class="px-4 py-2 rounded-lg transition {{ !request('category') && !request('filter') ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+               class="px-4 py-2 rounded-lg transition-all {{ !request('filter') && !request('type') ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
                 All
             </a>
-            <a href="{{ route('notifications.index', ['category' => 'application']) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('category') == 'application' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                📝 Applications
-            </a>
-            <a href="{{ route('notifications.index', ['category' => 'job']) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('category') == 'job' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                💼 Jobs
-            </a>
-            <a href="{{ route('notifications.index', ['category' => 'company']) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('category') == 'company' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                🏢 Companies
-            </a>
-            <a href="{{ route('notifications.index', ['category' => 'system']) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('category') == 'system' ? 'bg-red-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                ⚙️ System
-            </a>
-        </div>
-        
-        {{-- Read/Unread Filter Separator --}}
-        <div class="border-t border-gray-200 dark:border-gray-700 my-3"></div>
-        
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('notifications.index', array_merge(request()->except('filter'), ['filter' => 'unread'])) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('filter') == 'unread' ? 'bg-yellow-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                🔴 Unread
-                @if($stats['unread'] > 0)
+            <a href="{{ route('notifications.index', ['filter' => 'unread']) }}" 
+               class="px-4 py-2 rounded-lg transition-all {{ request('filter') == 'unread' ? 'bg-yellow-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                Unread
+                @if(($stats['unread'] ?? 0) > 0)
                     <span class="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">{{ $stats['unread'] }}</span>
                 @endif
             </a>
-            <a href="{{ route('notifications.index', array_merge(request()->except('filter'), ['filter' => 'read'])) }}" 
-               class="px-4 py-2 rounded-lg transition {{ request('filter') == 'read' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
-                ✅ Read
+            <a href="{{ route('notifications.index', ['filter' => 'read']) }}" 
+               class="px-4 py-2 rounded-lg transition-all {{ request('filter') == 'read' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' }}">
+                Read
             </a>
-            @if(request('category') || request('filter'))
-                <a href="{{ route('notifications.index') }}" 
-                   class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
-                    Clear Filters
-                </a>
-            @endif
         </div>
+        
+        @if(request('filter') || request('type'))
+            <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <a href="{{ route('notifications.index') }}" class="text-sm text-red-600 hover:text-red-700 transition-all">
+                    Clear all filters
+                </a>
+            </div>
+        @endif
     </div>
 
     {{-- Notifications List --}}
-    @if($notifications->count() > 0)
-        <div class="space-y-2" id="notifications-list">
+    @if(isset($notifications) && $notifications->count() > 0)
+        <div class="space-y-3" id="notifications-list">
             @foreach($notifications as $notification)
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition notification-item
-                    {{ !$notification->is_read ? 'border-l-4 border-l-red-600' : '' }}" 
-                    data-id="{{ $notification->id }}">
-                    
-                    <div class="flex items-start gap-4">
-                        {{-- Icon with Color --}}
-                        <div class="flex-shrink-0">
-                            <div class="w-12 h-12 rounded-full {{ $notification->getColor() == 'blue' ? 'bg-blue-100 text-blue-600' : 
-                                                                   ($notification->getColor() == 'green' ? 'bg-green-100 text-green-600' :
-                                                                   ($notification->getColor() == 'red' ? 'bg-red-100 text-red-600' :
-                                                                   ($notification->getColor() == 'yellow' ? 'bg-yellow-100 text-yellow-600' :
-                                                                   ($notification->getColor() == 'purple' ? 'bg-purple-100 text-purple-600' :
-                                                                   ($notification->getColor() == 'emerald' ? 'bg-emerald-100 text-emerald-600' :
-                                                                   ($notification->getColor() == 'orange' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600')))))) }} 
-                                flex items-center justify-center text-xl">
-                                {{ $notification->getIcon() }}
-                            </div>
-                        </div>
-                        
-                        {{-- Content --}}
-                        <div class="flex-1">
-                            <div class="flex flex-wrap items-start justify-between gap-2">
-                                <div>
-                                    <h3 class="font-semibold text-gray-900 dark:text-white">
-                                        {{ $notification->title }}
-                                    </h3>
-                                    <p class="text-gray-600 dark:text-gray-400 mt-1">
-                                        {{ $notification->message }}
-                                    </p>
-                                    <div class="flex flex-wrap items-center gap-3 mt-2">
-                                        <p class="text-xs text-gray-500">
-                                            {{ $notification->created_at->diffForHumans() }}
-                                        </p>
-                                        @if($notification->category)
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                                                {{ ucfirst($notification->category) }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-center gap-2">
-                                    @if(!$notification->is_read)
-                                        <button onclick="markAsRead({{ $notification->id }})" 
-                                                class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 transition">
-                                            Mark as read
-                                        </button>
-                                    @endif
-                                    <button onclick="deleteNotification({{ $notification->id }})" 
-                                            class="text-xs text-red-600 hover:text-red-700 dark:text-red-400 transition">
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {{-- Action Button --}}
-                            @if($notification->getActionUrl() != '#')
-                                <div class="mt-3">
-                                    <a href="{{ $notification->getActionUrl() }}" 
-                                       class="inline-flex items-center text-sm text-red-600 hover:text-red-700 dark:text-red-400 transition group">
-                                        View Details
-                                        <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
+                <x-notification-item :notification="$notification" />
             @endforeach
         </div>
         
@@ -239,9 +155,9 @@
             <p class="text-gray-600 dark:text-gray-400">
                 When you receive notifications, they'll appear here
             </p>
-            @if(request('category') || request('filter'))
+            @if(request('filter') || request('type'))
                 <a href="{{ route('notifications.index') }}" 
-                   class="inline-flex items-center px-4 py-2 mt-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                   class="inline-flex items-center px-4 py-2 mt-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all">
                     Clear Filters
                 </a>
             @endif
@@ -252,6 +168,7 @@
 @push('scripts')
 <script>
 let isProcessing = false;
+let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
 function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
@@ -277,75 +194,65 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-function markAsRead(notificationId) {
+async function markAsRead(notificationId) {
     if (isProcessing) return;
     isProcessing = true;
     
-    fetch(`/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
+    try {
+        const response = await fetch(`/notifications/${notificationId}/read`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        });
+        const data = await response.json();
+        
         if (data.success) {
-            // Remove the unread styling without reload
             const notificationDiv = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
             if (notificationDiv) {
                 notificationDiv.classList.remove('border-l-4', 'border-l-red-600');
-                const markButton = notificationDiv.querySelector('button:first-child');
+                const markButton = notificationDiv.querySelector('.mark-read-btn');
                 if (markButton) markButton.remove();
             }
             
-            // Update unread count in stats
-            const unreadCountSpan = document.querySelector('.text-2xl.font-bold.text-yellow-600');
-            if (unreadCountSpan) {
-                let currentCount = parseInt(unreadCountSpan.innerText);
-                if (currentCount > 0) {
-                    unreadCountSpan.innerText = currentCount - 1;
-                }
+            // Update unread count
+            const unreadSpan = document.querySelector('.text-2xl.font-bold.text-yellow-600');
+            if (unreadSpan) {
+                let currentCount = parseInt(unreadSpan.innerText);
+                if (currentCount > 0) unreadSpan.innerText = currentCount - 1;
             }
             
             showNotification('Notification marked as read', 'success');
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error:', error);
         showNotification('Failed to mark as read', 'error');
-    })
-    .finally(() => {
+    } finally {
         isProcessing = false;
-    });
+    }
 }
 
-function deleteNotification(notificationId) {
-    if (!confirm('Are you sure you want to delete this notification?')) {
-        return;
-    }
-    
+async function deleteNotification(notificationId) {
+    if (!confirm('Are you sure you want to delete this notification?')) return;
     if (isProcessing) return;
     isProcessing = true;
     
-    fetch(`/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Remove the notification from DOM
-            const notificationDiv = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
-            if (notificationDiv) {
-                notificationDiv.remove();
+    try {
+        const response = await fetch(`/notifications/${notificationId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             }
-            
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            const notificationDiv = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
+            if (notificationDiv) notificationDiv.remove();
             showNotification('Notification deleted', 'success');
             
             // Check if no notifications left
@@ -354,123 +261,99 @@ function deleteNotification(notificationId) {
                 location.reload();
             }
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error:', error);
         showNotification('Failed to delete notification', 'error');
-    })
-    .finally(() => {
+    } finally {
         isProcessing = false;
-    });
+    }
 }
 
 // Mark all as read
-document.getElementById('markAllReadBtn')?.addEventListener('click', function() {
-    if (isProcessing) return;
-    isProcessing = true;
-    
-    fetch('{{ route("notifications.mark-all-read") }}', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Remove all unread styling
-            document.querySelectorAll('.notification-item.border-l-4').forEach(item => {
-                item.classList.remove('border-l-4', 'border-l-red-600');
-                const markButton = item.querySelector('button:first-child');
-                if (markButton) markButton.remove();
+const markAllBtn = document.getElementById('markAllReadBtn');
+if (markAllBtn) {
+    markAllBtn.addEventListener('click', async function() {
+        if (isProcessing) return;
+        isProcessing = true;
+        
+        try {
+            const response = await fetch('{{ route("notifications.mark-all-read") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             });
+            const data = await response.json();
             
-            // Update unread count to 0
-            const unreadCountSpan = document.querySelector('.text-2xl.font-bold.text-yellow-600');
-            if (unreadCountSpan) {
-                unreadCountSpan.innerText = '0';
+            if (data.success) {
+                document.querySelectorAll('.notification-item.border-l-4').forEach(item => {
+                    item.classList.remove('border-l-4', 'border-l-red-600');
+                    const btn = item.querySelector('.mark-read-btn');
+                    if (btn) btn.remove();
+                });
+                const unreadSpan = document.querySelector('.text-2xl.font-bold.text-yellow-600');
+                if (unreadSpan) unreadSpan.innerText = '0';
+                showNotification('All notifications marked as read', 'success');
             }
-            
-            showNotification('All notifications marked as read', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Failed to mark all as read', 'error');
+        } finally {
+            isProcessing = false;
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Failed to mark all as read', 'error');
-    })
-    .finally(() => {
-        isProcessing = false;
     });
-});
+}
 
 // Clear all notifications
-document.getElementById('clearAllBtn')?.addEventListener('click', function() {
-    if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
-        return;
-    }
-    
-    if (isProcessing) return;
-    isProcessing = true;
-    
-    fetch('{{ route("notifications.clear-all") }}', {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+const clearAllBtn = document.getElementById('clearAllBtn');
+if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', async function() {
+        if (!confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) return;
+        if (isProcessing) return;
+        isProcessing = true;
+        
+        try {
+            const response = await fetch('{{ route("notifications.clear-all") }}', {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Failed to clear notifications', 'error');
+        } finally {
+            isProcessing = false;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Failed to clear notifications', 'error');
-    })
-    .finally(() => {
-        isProcessing = false;
     });
-});
+}
 
 // Add animation styles
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
+if (!document.querySelector('#notification-animations')) {
+    const style = document.createElement('style');
+    style.id = 'notification-animations';
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
-        to {
-            transform: translateX(0);
-            opacity: 1;
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
         }
-    }
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
+    `;
+    document.head.appendChild(style);
+}
 </script>
 @endpush
-
-{{-- Add route for clear all if not exists --}}
-@php
-    if (!Route::has('notifications.clear-all')) {
-        \Illuminate\Support\Facades\Route::delete('/notifications/clear-all', [App\Http\Controllers\NotificationController::class, 'clearAll'])
-            ->name('notifications.clear-all');
-    }
-@endphp
 
 @endsection

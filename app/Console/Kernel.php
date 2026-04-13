@@ -13,6 +13,32 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
 {
     $schedule->command('jobs:check-expiring')->daily();
+
+    // ========== NOTIFICATION SCHEDULES ==========
+        
+        // Send daily job alerts at 8 AM
+        $schedule->command('notifications:send-job-alerts --frequency=daily')
+            ->dailyAt('08:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/job-alerts.log'));
+        
+        // Send weekly job alerts on Monday at 9 AM
+        $schedule->command('notifications:send-job-alerts --frequency=weekly')
+            ->weeklyOn(1, '09:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/job-alerts.log'));
+        
+        // Send instant job alerts every 15 minutes
+        $schedule->command('notifications:send-job-alerts --frequency=instant')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/job-alerts.log'));
+        
+        // Clean old notifications daily at 2 AM
+        $schedule->command('notifications:clean --days=30')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/notifications-clean.log'));
 }
 
     /**
